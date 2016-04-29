@@ -14,7 +14,7 @@ install:
   - cd Platforms && ./premake5 gmake && cd ..
 
 script:
-  - if [ $TRAVIS_OS_NAME == linux ]; make -C build/gmake xv_xyz_grid config=release; fi
-  - if [ $TRAVIS_OS_NAME == osx ];  make -C build/gmake config=release; fi
+  - if [ $TRAVIS_OS_NAME == linux ]; then make -C build/gmake xv_xyz_grid config=release; fi
+  - if [ $TRAVIS_OS_NAME == osx ];  then make -C build/gmake config=release; fi
 notifications:
   email: false
