@@ -11,7 +11,7 @@ before_install:
 
 install:
   - git submodule update --init --recursive
-  - cd Platforms && ./premake5 gmake && cd ..; fi
+  - cd Platforms && ./premake5 gmake && cd ..
 
 script:
   - make -C build/gmake xv_xyz_grid config=release
