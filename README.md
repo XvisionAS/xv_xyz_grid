@@ -1,5 +1,5 @@
 # What is it ?
-This tool allows to take a XYZ file and transform it into an OBJ file.
+This tool takes a XYZ file and transform it into an OBJ file.
 
 # How does it works ?
 * It reads the XYZ file into a list of points
