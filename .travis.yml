@@ -6,15 +6,15 @@ os:
 
 
 before_install:
-  - if [ $TRAVIS_OS_NAME == linux ]; then git clone --recursive https://github.com/premake/premake-core.git && cd premake-core && make -f Bootstrap.mak $TRAVIS_OS_NAME && cp bin/release/premake5 ../platforms/premake5.linux && cd ..; fi
+  - if [ $TRAVIS_OS_NAME == linux ]; then git clone --recursive https://github.com/premake/premake-core.git && cd premake-core && make -f Bootstrap.mak $TRAVIS_OS_NAME && cp bin/release/premake5 ../Platforms && cd ..; fi
+  - if [ $TRAVIS_OS_NAME == osx ]; then git clone --recursive https://github.com/premake/premake-core.git && cd premake-core && make -f Bootstrap.mak $TRAVIS_OS_NAME && cp bin/release/premake5 ../Platforms && cd ..; fi
 
 install:
   - git submodule update --init --recursive
-  - if [ $TRAVIS_OS_NAME == linux ]; then  cd platforms && ./premake5.linux gmake && cd ..; fi
-  - if [ $TRAVIS_OS_NAME == osx ]; then  cd platforms && ./premake5.osx gmake && cd ..; fi
+  - cd Platforms && ./premake5 gmake && cd ..; fi
 
 script:
-  - make -C build/gmake xv_xyz_grid config=release  
+  - make -C build/gmake xv_xyz_grid config=release
 
 notifications:
   email: false
