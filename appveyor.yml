@@ -7,7 +7,7 @@ environment:
 
 install:
   - git submodule update --init --recursive
-  - cd platforms && premake5.exe %TOOLSET% && cd ..
+  - cd Platforms && premake5.exe %TOOLSET% && cd ..
 
 configuration: Release
 
