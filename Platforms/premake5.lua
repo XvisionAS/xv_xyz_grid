@@ -12,32 +12,39 @@ workspace "xv_xyz_grid"
 
   project "xv_xyz_grid"
     kind "ConsoleApp"
-    language "C"
-		files {
-			"../Externals/triangle/**.c",
-			"../Externals/triangle/**.h"
-		}
+
+		language "C"
+			files {
+				"../Externals/triangle/**.c",
+				"../Externals/triangle/**.h"
+			}
+
 		language "C++"
-		buildoptions {"-std=c++11"}
-		linkoptions {"-std=c++11"}
 		files {
 			"../Externals/glm/**.hpp",
 			"../Externals/cmdline/**.h",
 			"../xv_xyz_grid.cpp"
 		}
+
 		includedirs {
 			"../Externals",
 		}
 
+		filter { "files:../*.cpp" }
+
+
 		filter "system:linux"
-			toolset "clang"
+			buildoptions { "-std=c++11"}
+			linkoptions  { "-std=c++11"}
 			links {"m", "dl"}
+
 		filter "system:macosx"
 			platforms 	{"Universal"}
 			defines {"MACOSX"}
 			links       { "CoreFoundation.framework", "Cocoa.framework", "IOKit.framework"}
-			buildoptions { "-std=c++11", "-mmacosx-version-min=10.4" }
-			linkoptions  { "-std=c++11", "-mmacosx-version-min=10.4" }
+			buildoptions { "-mmacosx-version-min=10.4" }
+			linkoptions  { "-mmacosx-version-min=10.4" }
+
 		filter "system:windows"
 			architecture ("x86")
 		filter "configurations:Debug"
