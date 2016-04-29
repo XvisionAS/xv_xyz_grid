@@ -8,10 +8,10 @@
 #include <cstdint>
 #include <chrono>
 
-#include <glm\glm.hpp>
-#include <glm\gtc\epsilon.hpp>
-#include <glm\gtx\intersect.hpp>
-#include <cmdline\cmdline.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/epsilon.hpp>
+#include <glm/gtx/intersect.hpp>
+#include <cmdline/cmdline.h>
 
 #if defined(SINGLE)
 typedef float real;
@@ -27,7 +27,7 @@ typedef glm::dvec3 vec3;
 #define VOID void
 
 extern "C" {
-#include <triangle\triangle.h>
+#include <triangle/triangle.h>
 }
 
 struct AABB {

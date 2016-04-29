@@ -29,12 +29,14 @@ workspace "xv_xyz_grid"
 		filter "system:linux"
 			toolset "clang"
 			links {"m", "dl"}
+			buildoptions {"-std=c++11"}
+			linkoptions {"-std=c++11"}
 		filter "system:macosx"
 			platforms 	{"Universal"}
 			defines {"MACOSX"}
 			links       { "CoreFoundation.framework", "Cocoa.framework", "IOKit.framework"}
-			buildoptions { "-mmacosx-version-min=10.4" }
-			linkoptions  { "-mmacosx-version-min=10.4" }
+			buildoptions { "-std=c++11", "-mmacosx-version-min=10.4" }
+			linkoptions  { "-std=c++11", "-mmacosx-version-min=10.4" }
 		filter "system:windows"
 			architecture ("x86")
 		filter "configurations:Debug"
