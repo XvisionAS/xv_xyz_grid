@@ -18,6 +18,8 @@ workspace "xv_xyz_grid"
 			"../Externals/triangle/**.h"
 		}
 		language "C++"
+		buildoptions {"-std=c++11"}
+		linkoptions {"-std=c++11"}
 		files {
 			"../Externals/glm/**.hpp",
 			"../Externals/cmdline/**.h",
@@ -26,11 +28,10 @@ workspace "xv_xyz_grid"
 		includedirs {
 			"../Externals",
 		}
+
 		filter "system:linux"
 			toolset "clang"
 			links {"m", "dl"}
-			buildoptions {"-std=c++11"}
-			linkoptions {"-std=c++11"}
 		filter "system:macosx"
 			platforms 	{"Universal"}
 			defines {"MACOSX"}
