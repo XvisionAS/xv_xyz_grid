@@ -1,3 +1,7 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/m34w5lx6n8b2cbje?svg=true)](https://ci.appveyor.com/project/olivierchatry/xv-xyz-grid)
+
+[![Build Status](https://travis-ci.org/olivierchatry/xv_xyz_grid.svg)](https://travis-ci.org/olivierchatry/xv_xyz_grid.svg)
+
 # What is it ?
 This tool takes a XYZ file and transform it into an OBJ file.
 
