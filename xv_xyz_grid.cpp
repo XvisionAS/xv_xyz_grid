@@ -135,8 +135,8 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	in.numberofpointattributes = 1;
 
 	in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
-	in.pointattributelist = (REAL *)malloc(
-		in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
+	in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
+
 	for (auto i = 0; i < in.numberofpoints; ++i) {
 		auto indexDst = i * 2;
 		const auto &p = points[i];
@@ -149,8 +149,10 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	in.numberofsegments = 0;
 	in.numberofholes = 0;
 	in.numberofregions = 0;
+	
 	memset(out, 0, sizeof(*out));
 	triangulate("zQ", &in, out, NULL);
+	
 	free(in.pointattributelist);
 	free(in.pointlist);
 }
@@ -211,6 +213,14 @@ void output_grid(int* triangles, tPoints& points, tNodeGrid& nodes) {
 	}
 }
 
+template <typename OUT, typename T>
+bool write_binary(std::ofstream& out, T& value) {
+	OUT v = (OUT)value;
+	return out.write((char*)&v, sizeof(v)).good();
+}
+
+
+
 int main(int ac, char **av) {
 	cmdline::parser cmdparser;
 	// generate_test_grid();
@@ -245,8 +255,7 @@ int main(int ac, char **av) {
 		const int cNodeGridHeight = 10;
 
 		{
-			Timing _("1. loads points, this can take a bit of time ( and memory ) "
-				"depending on the size of the datasets");
+			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets");
 			std::ifstream input(inputs[arg]);
 			real x, y, z;
 			while (input >> x >> y >> z) {
@@ -323,16 +332,16 @@ int main(int ac, char **av) {
 				// output_grid(mid.trianglelist, points_input, grid);
 
 
-				int pt_count = cmdparser.get<int>("simplify-split");
+				int	pt_count = cmdparser.get<int>("simplify-split");
 
 				vec3 direction(0, 0, -1);
 				vec3 start(0, 0, glm::abs(aabb.mMax.z) * 2);
-				real delta_x = len.x / (real)pt_count;
-				real delta_y = len.y / (real)pt_count;
+				real delta_x = len.x / (real)(pt_count + 1);
+				real delta_y = len.y / (real)(pt_count + 1);
 				bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
 
-				for (int y = 0; y <= pt_count; ++y) {
-					for (int x = 0; x <= pt_count; ++x) {
+				for (int y = 0; y < pt_count; ++y) {
+					for (int x = 0; x < pt_count; ++x) {
 						start.x = aabb.mMin.x + x * delta_x;
 						start.y = aabb.mMin.y + y * delta_y;
 
@@ -371,9 +380,8 @@ int main(int ac, char **av) {
 
 		{
 			Timing _("6. generating output OBJ");
-			std::string outputFileName = inputs[arg] + ".obj";
-
-			std::ofstream output(outputFileName.c_str());
+			std::string output_file_name = inputs[arg] + ".obj";
+			std::ofstream output(output_file_name.c_str());
 			auto scale = cmdparser.get<float>("scale");
 			std::cout << ", scale value " << scale;
 			for (auto i = 0; i < mid.numberofpoints; ++i) {
@@ -391,6 +399,34 @@ int main(int ac, char **av) {
 				}
 				output << std::endl;
 			}
+		}
+
+		{
+			Timing _("7. generating output XVB");
+
+			std::string		output_file_name = inputs[arg] + ".xvb";
+			std::ofstream output(output_file_name.c_str(), std::ios_base::binary | std::ios_base::trunc);
+
+			auto scale = cmdparser.get<float>("scale");
+
+			int		pt_count = cmdparser.get<int>("simplify-split");
+			
+			write_binary<int>(output, pt_count);
+			
+			float min = aabb.mMin.x;
+			write_binary<float>(output, aabb.mMin.x);
+			write_binary<float>(output, aabb.mMin.y);
+			write_binary<float>(output, aabb.mMin.z);
+			
+			write_binary<float>(output, aabb.mMax.x);
+			write_binary<float>(output, aabb.mMax.y);
+			write_binary<float>(output, aabb.mMax.z);
+
+			for (auto& v : points_result) {
+				write_binary<float>(output, v.z);
+			}
+			
+
 		}
 		free(mid.pointlist);
 		free(mid.pointattributelist);
