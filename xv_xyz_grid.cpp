@@ -251,8 +251,6 @@ int main(int ac, char **av) {
 		AABB aabb;
 
 		std::cout << "** processing " << inputs[arg] << std::endl;
-		const int cNodeGridWidth = 10;
-		const int cNodeGridHeight = 10;
 
 		{
 			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets");
@@ -269,6 +267,9 @@ int main(int ac, char **av) {
 
 		{
 			Timing _("2. removing duplicate points");
+
+			const int cNodeGridWidth = 256;
+			const int cNodeGridHeight = 256;
 
 			points_result.reserve(points_input.size());
 			auto size = points_input.size();
@@ -295,6 +296,9 @@ int main(int ac, char **av) {
 
 		if (cmdparser.get<bool>("simplify")) {
 			{
+				const int cNodeGridWidth = 16;
+				const int cNodeGridHeight = 16;
+
 				Timing _("4. generation of the simplified dataset");
 				tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
 
