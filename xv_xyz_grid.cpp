@@ -352,6 +352,7 @@ int main(int ac, char **av) {
 			real delta_x = len.x / (real)(pt_count_x + 1);
 			real delta_y = len.y / (real)(pt_count_y + 1);
 			bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
+			real previous = aabb.mMin.z;
 
 			for (int y = 0; y < pt_count_y; ++y) {
 				for (int x = 0; x < pt_count_x; ++x) {
@@ -374,7 +375,15 @@ int main(int ac, char **av) {
 					}
 
 					if (generate_missing && !generated) {
-						points_result.push_back(vec3(start.x, start.y, aabb.mMin.z));
+						size_t index = y * pt_count_x + x;
+						if (y > 0) {
+							previous = points_result[index - pt_count_x].z;
+						}
+						else if (x > 0) {
+							previous = points_result[index - 1].z;
+						}
+
+						points_result.push_back(vec3(start.x, start.y, previous));
 					}
 				}
 			}
