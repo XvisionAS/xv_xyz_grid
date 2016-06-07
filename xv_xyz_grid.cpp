@@ -267,12 +267,18 @@ int main(int ac, char **av) {
 		{
 			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets");
 			std::ifstream input(inputs[arg]);
-			real x, y, z;
-			while (input >> x >> y >> z) {
-				vec3 p(x, y, z);
-
-				points_input.push_back(p);
-				aabb.add(p);
+			vec3 p;
+			for (std::string line; std::getline(input, line); ) {
+				size_t comment = line.find("#");
+				if (comment > 0) {
+					if (comment != std::string::npos) {
+						line = line.substr(0, comment);
+					}
+					if (std::sscanf(line.c_str(), "%f %f %f", &p.x, &p.y, &p.z) == 3) {
+						points_input.push_back(p);
+						aabb.add(p);
+					}
+				}
 			}
 		}
 		vec3 len = aabb.len();

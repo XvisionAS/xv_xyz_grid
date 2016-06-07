@@ -32,7 +32,7 @@ workspace "xv_xyz_grid"
 
 		filter { "files:../*.cpp" }
 
-
+		flags { "C++11" }
 		filter "system:linux"
 			buildoptions { "-std=c++11"}
 			linkoptions  { "-std=c++11"}
@@ -46,10 +46,12 @@ workspace "xv_xyz_grid"
 			linkoptions  { "-mmacosx-version-min=10.4" }
 
 		filter "system:windows"
-			architecture ("x86")
+			architecture ("x86")			
+			linkoptions ("/LARGEADDRESSAWARE")
+
 		filter "configurations:Debug"
 			defines { "DEBUG" }
 			flags { "Symbols" }
 		filter "configurations:Release"
 			defines { "NDEBUG" }
-			optimize "On"
+			optimize "Full"
