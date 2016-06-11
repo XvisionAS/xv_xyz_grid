@@ -23,6 +23,10 @@ workspace "xv_xyz_grid"
 		files {
 			"../Externals/glm/**.hpp",
 			"../Externals/cmdline/**.h",
+			"../Externals/delaunay/delaunay.*",
+			"../Externals/delaunay/edge.*",
+			"../Externals/delaunay/triangle.*",
+			"../Externals/delaunay/vector2.*",
 			"../xv_xyz_grid.cpp"
 		}
 
@@ -46,7 +50,7 @@ workspace "xv_xyz_grid"
 			linkoptions  { "-mmacosx-version-min=10.4" }
 
 		filter "system:windows"
-			architecture ("x86")			
+			architecture ("x86")
 			linkoptions ("/LARGEADDRESSAWARE")
 
 		filter "configurations:Debug"
