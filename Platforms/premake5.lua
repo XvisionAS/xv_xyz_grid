@@ -23,10 +23,6 @@ workspace "xv_xyz_grid"
 		files {
 			"../Externals/glm/**.hpp",
 			"../Externals/cmdline/**.h",
-			"../Externals/delaunay/delaunay.*",
-			"../Externals/delaunay/edge.*",
-			"../Externals/delaunay/triangle.*",
-			"../Externals/delaunay/vector2.*",
 			"../xv_xyz_grid.cpp"
 		}
 
