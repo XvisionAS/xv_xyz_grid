@@ -39,7 +39,9 @@ workspace "xv_xyz_grid"
 		flags { "C++11" }
 		filter "system:linux"
 			links {"m", "dl"}
-    	buildoptions { "-std=c++11" }
+    	buildoptions { "-std=c++11", "-m32" }
+			linkoptions { "-m32" }
+
 		filter "system:macosx"
 			platforms 	{"Universal"}
 			defines {"MACOSX"}
