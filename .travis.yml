@@ -3,7 +3,7 @@ language: cpp
 os:
   - linux
   - osx
-env: GCC_VERSION=5 CPP=11
+env: GCC_VERSION=5 CPP=11 COMPILER=g++-5 CC=gcc-5 CXX=g++-5
 sudo: false
 
 addons: &gcc5
