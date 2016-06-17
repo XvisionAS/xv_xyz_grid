@@ -3,17 +3,17 @@ language: cpp
 os:
   - linux
   - osx
-
+env: GCC_VERSION=5 CPP=11
 sudo: false
 
-addons:
+addons: &gcc5
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
     packages:
       - gcc-5
       - g++-5
       - libssl-dev
+    sources:
+      - ubuntu-toolchain-r-test
 before_install:
   - if [ $TRAVIS_OS_NAME == linux ]; then git clone --recursive https://github.com/premake/premake-core.git && cd premake-core && make -f Bootstrap.mak $TRAVIS_OS_NAME && cp bin/release/premake5 ../Platforms && cd ..; fi
   - if [ $TRAVIS_OS_NAME == osx ]; then git clone --recursive https://github.com/premake/premake-core.git && cd premake-core && make -f Bootstrap.mak $TRAVIS_OS_NAME && cp bin/release/premake5 ../Platforms && cd ..; fi
