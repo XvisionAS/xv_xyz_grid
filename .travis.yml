@@ -11,7 +11,7 @@ addons:
     s3_region: "eu-west-1"
     debug: true
     paths:
-    - $HOME/build/bin/xv_xyz_grid
+    - build/bin/xv_xyz_grid
   apt:
     packages:
       - gcc-5
