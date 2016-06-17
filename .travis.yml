@@ -19,6 +19,8 @@ addons:
       - gcc-5-multilib
       - g++-5-multilib
       - libssl-dev
+      - linux-libc-dev
+
     sources:
       - ubuntu-toolchain-r-test
 
