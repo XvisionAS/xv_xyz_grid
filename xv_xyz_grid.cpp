@@ -223,44 +223,46 @@ bool write_binary(std::ofstream& out, T& value) {
 
 int main(int ac, char **av) {
 	cmdline::parser cmdparser;
-	// generate_test_grid();
-	cmdparser.add<int>("simplify-split", 'c', "Number of split used to generate "
-		"the simplification grid, both axis ",		
-		false, 256);
-	cmdparser.add<int>("simplify-split-x", 'x', "Number of split used to generate "
-		"the simplification grid, y axis",
-		false, 256);
-	cmdparser.add<int>("simplify-split-y", 'y', "Number of split used to generate "
-		"the simplification grid, x axis",
-		false, 256);
-	cmdparser.add<bool>("simplify-generate-missing", 'g',
-		"When generating simplification grid, point that are not "
-		"part of the dataset will be generated using the lowest "
-		"value in the dataset",
-		false, true);
+	cmdparser.add<int>("simplify-split",
+		'a',
+		"Number of split used to generate the simplification grid",
+		false,
+		256);
 
-	cmdparser.add<float>("scale", 's', "Multiply all points by this value", false,
-		1);
+	cmdparser.add<bool>("simplify-split-use-ratio",
+		'b',
+		"Compute the ratio of dataset, apply it to number of split",
+		false,
+		false);
+	cmdparser.add<bool>("simplify-generate-missing",
+		'c',
+		"Generate missing depth value in dataset, using previous value",
+		false,
+		true);
+
+	cmdparser.add<bool>("simplify-use-min",
+		'd',
+		"Missing value will use minimum depth value",
+		false,
+		true);
+
+	cmdparser.add<bool>("simplify-use-max",
+		'e',
+		"Missing value will use maximum depth value",
+		false,
+		false);
 
 	cmdparser.parse_check(ac, av);
 	setlocale(LC_ALL, "C");
 
 	auto &inputs = cmdparser.rest();
 
-	int	pt_count_x = cmdparser.get<int>("simplify-split");
-	int pt_count_y = cmdparser.get<int>("simplify-split");
-	if (cmdparser.exist("simplify-split-x")) {
-		pt_count_x = cmdparser.get<int>("simplify-split-x");
-	}
-	if (cmdparser.exist("simplify-split-y")) {
-		pt_count_y = cmdparser.get<int>("simplify-split-y");
-	}
 	
-	std::cout << "** simplification grid size " << pt_count_x << " * " << pt_count_y << std::endl;
 	for (size_t arg = 0; arg < inputs.size(); arg++) {
 		tPoints points_input;
 		tPoints points_result;
 		AABB aabb;
+
 
 		std::cout << "** processing " << inputs[arg] << std::endl;
 
@@ -282,6 +284,7 @@ int main(int ac, char **av) {
 			}
 		}
 		vec3 len = aabb.len();
+
 
 		{
 			Timing _("2. removing duplicate points");
@@ -311,6 +314,17 @@ int main(int ac, char **av) {
 		}
 
 		points_result.clear();
+
+		int pt_count_x = cmdparser.get<int>("simplify-split");
+		int pt_count_y = pt_count_x;
+
+		if (cmdparser.get<bool>("simplify-split-use-ratio")) {
+			real ratio = len.x / len.y;
+			pt_count_x = (int)glm::max<real>((pt_count_y * ratio), 4);
+			pt_count_x = glm::min<int>(pt_count_x, pt_count_y);
+		}
+
+		std::cout << "** simplification grid size " << pt_count_x << " * " << pt_count_y << std::endl;
 
 		{
 			const int cNodeGridWidth = 16;
@@ -358,7 +372,8 @@ int main(int ac, char **av) {
 			real delta_x = len.x / (real)(pt_count_x + 1);
 			real delta_y = len.y / (real)(pt_count_y + 1);
 			bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
-			real previous = aabb.mMin.z;
+			real previous = cmdparser.get<bool>("simplify-use-min") ? glm::min(aabb.mMin.z, aabb.mMax.z) : glm::max(aabb.mMin.z, aabb.mMax.z);
+			bool use_previous = !(cmdparser.get<bool>("simplify-use-min") | cmdparser.get<bool>("simplify-use-max"));
 
 			for (int y = 0; y < pt_count_y; ++y) {
 				for (int x = 0; x < pt_count_x; ++x) {
@@ -381,14 +396,15 @@ int main(int ac, char **av) {
 					}
 
 					if (generate_missing && !generated) {
-						size_t index = y * pt_count_x + x;
-						if (y > 0) {
-							previous = points_result[index - pt_count_x].z;
+						if (use_previous) {
+							size_t index = y * pt_count_x + x;
+							if (y > 0) {
+								previous = points_result[index - pt_count_x].z;
+							}
+							else if (x > 0) {
+								previous = points_result[index - 1].z;
+							}
 						}
-						else if (x > 0) {
-							previous = points_result[index - 1].z;
-						}
-
 						points_result.push_back(vec3(start.x, start.y, previous));
 					}
 				}
@@ -436,14 +452,12 @@ int main(int ac, char **av) {
 			Timing _("7. generating output OBJ");
 			std::string output_file_name = inputs[arg] + ".obj";
 			std::ofstream output(output_file_name.c_str());
-			auto scale = cmdparser.get<float>("scale");
-			std::cout << ", scale value " << scale;
 			for (auto i = 0; i < mid.numberofpoints; ++i) {
 				auto index = i * 2;
 				output << std::fixed 
-					<< "v " << (mid.pointlist[index + 0] * scale) 
-					<< " " << (mid.pointlist[index + 1] * scale) 
-					<< " " << (mid.pointattributelist[i] * scale) << std::endl;
+					<< "v " << (mid.pointlist[index + 0]) 
+					<< "  " << (mid.pointlist[index + 1]) 
+					<< "  " << (mid.pointattributelist[i]) << std::endl;
 			}
 
 			for (auto i = 0; i < mid.numberoftriangles; i++) {
