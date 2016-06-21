@@ -23,7 +23,8 @@ workspace "xv_xyz_grid"
 		files {
 			"../Externals/glm/**.hpp",
 			"../Externals/cmdline/**.h",
-			"../xv_xyz_grid.cpp"
+			"../*.cpp",
+			"../*.hpp"
 		}
 
 		includedirs {
