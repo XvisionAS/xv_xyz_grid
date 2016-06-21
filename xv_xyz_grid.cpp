@@ -30,6 +30,24 @@ extern "C" {
 #include <triangle/triangle.h>
 }
 
+inline void* aligned_malloc(size_t size, size_t align) {
+	void *result;
+#ifdef _MSC_VER 
+	result = _aligned_malloc(size, align);
+#else 
+	if (posix_memalign(&result, align, size)) result = 0;
+#endif
+	return result;
+}
+
+inline void aligned_free(void *ptr) {
+#ifdef _MSC_VER 
+	_aligned_free(ptr);
+#else 
+	free(ptr);
+#endif
+}
+
 struct AABB {
 
   AABB()
@@ -131,11 +149,11 @@ struct tNodeGrid {
 void generate_grid(const tPoints &points, struct triangulateio *out) {
 	struct triangulateio in;
 	memset(&in, 0, sizeof(in));
-	in.numberofpoints = points.size();
+	in.numberofpoints = (int) points.size();
 	in.numberofpointattributes = 1;
 
-	in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
-	in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
+	in.pointlist = (REAL *)aligned_malloc(in.numberofpoints * 2 * sizeof(REAL), sizeof(void*));
+	in.pointattributelist = (REAL *)aligned_malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL), sizeof(void*));
 
 	for (auto i = 0; i < in.numberofpoints; ++i) {
 		auto indexDst = i * 2;
@@ -153,8 +171,8 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	memset(out, 0, sizeof(*out));
 	triangulate("zQ", &in, out, NULL);
 	
-	free(in.pointattributelist);
-	free(in.pointlist);
+	aligned_free(in.pointattributelist);
+	aligned_free(in.pointlist);
 }
 
 struct Timing {
@@ -298,7 +316,7 @@ int main(int ac, char **av) {
 			for (auto &p : points_input) {
 				tNode &node = grid.nodeAt(p);
 				if (!node.find_point(points_result, p)) {
-					node.indices.push_back(points_result.size());
+					node.indices.push_back((uint32_t) points_result.size());
 					points_result.push_back(p);
 				}
 			}

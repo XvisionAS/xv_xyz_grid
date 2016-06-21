@@ -6,7 +6,7 @@ workspace "xv_xyz_grid"
 
   configurations {"Debug", "Release"}
 	defines { "GLM_FORCE_RADIANS" }
-	defines     { "SINGLE", "TRILIBRARY", "NO_TIMER" }
+	defines     { "SINGLE", "TRILIBRARY", "NO_TIMER", "TRILIBRARY_x64" }
 	filter "action:vs*"
 		defines     { "_CRT_SECURE_NO_WARNINGS" }
 
@@ -35,8 +35,8 @@ workspace "xv_xyz_grid"
 		flags { "C++11" }
 		filter "system:linux"
 			links {"m", "dl"}
-    	buildoptions { "-std=c++11", "-m32" }
-			linkoptions { "-m32" }
+    	buildoptions { "-std=c++11", "-m64" }
+			linkoptions { "-m64" }
 
 		filter "system:macosx"
 			platforms 	{"Universal"}
@@ -46,8 +46,7 @@ workspace "xv_xyz_grid"
 			linkoptions  { "-mmacosx-version-min=10.4" }
 
 		filter "system:windows"
-			architecture ("x86")
-			linkoptions ("/LARGEADDRESSAWARE")
+			architecture ("x86_64")			
 
 		filter "configurations:Debug"
 			defines { "DEBUG" }
