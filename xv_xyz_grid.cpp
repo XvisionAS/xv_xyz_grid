@@ -179,6 +179,8 @@ struct Timing {
 	Timing(const char* description) {
 		mStart = std::chrono::steady_clock::now();
 		std::cout << description;
+		std::cout.flush();
+
 	}
 
 	~Timing() {
