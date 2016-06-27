@@ -152,8 +152,8 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	in.numberofpoints = (int) points.size();
 	in.numberofpointattributes = 1;
 
-	in.pointlist = (REAL *)aligned_malloc(in.numberofpoints * 2 * sizeof(REAL), sizeof(void*));
-	in.pointattributelist = (REAL *)aligned_malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL), sizeof(void*));
+	in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
+	in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
 
 	for (auto i = 0; i < in.numberofpoints; ++i) {
 		auto indexDst = i * 2;
@@ -171,8 +171,8 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	memset(out, 0, sizeof(*out));
 	triangulate("zQ", &in, out, NULL);
 	
-	aligned_free(in.pointattributelist);
-	aligned_free(in.pointlist);
+	free(in.pointattributelist);
+	free(in.pointlist);
 }
 
 struct Timing {
@@ -325,7 +325,7 @@ int main(int ac, char **av) {
 		}
 
 
-		points_input.clear();
+		points_input.swap(tPoints());
 		struct triangulateio mid;
 
 		{
@@ -333,7 +333,7 @@ int main(int ac, char **av) {
 			generate_grid(points_result, &mid);
 		}
 
-		points_result.clear();
+		points_result.swap(tPoints());
 
 		int pt_count_x = cmdparser.get<int>("simplify-split");
 		int pt_count_y = pt_count_x;
