@@ -325,7 +325,7 @@ int main(int ac, char **av) {
 		}
 
 
-		points_input.swap(tPoints());
+		points_input.clear();
 		struct triangulateio mid;
 
 		{
@@ -333,7 +333,7 @@ int main(int ac, char **av) {
 			generate_grid(points_result, &mid);
 		}
 
-		points_result.swap(tPoints());
+		points_result.clear();
 
 		int pt_count_x = cmdparser.get<int>("simplify-split");
 		int pt_count_y = pt_count_x;
