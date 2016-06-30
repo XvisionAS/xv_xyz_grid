@@ -12,6 +12,7 @@
 #include <glm/gtc/epsilon.hpp>
 #include <glm/gtx/intersect.hpp>
 #include <cmdline/cmdline.h>
+#include <s_hull_pro/s_hull_pro.h>
 
 #if defined(SINGLE)
 typedef float real;
@@ -29,24 +30,7 @@ typedef glm::dvec3 vec3;
 extern "C" {
 #include <triangle/triangle.h>
 }
-
-inline void* aligned_malloc(size_t size, size_t align) {
-	void *result;
-#ifdef _MSC_VER 
-	result = _aligned_malloc(size, align);
-#else 
-	if (posix_memalign(&result, align, size)) result = 0;
-#endif
-	return result;
-}
-
-inline void aligned_free(void *ptr) {
-#ifdef _MSC_VER 
-	_aligned_free(ptr);
-#else 
-	free(ptr);
-#endif
-}
+// #include "utils.h"
 
 struct AABB {
 
@@ -145,9 +129,73 @@ struct tNodeGrid {
   vec3 mCoordSize;
 };
 
+bool pointSortPredicate(const Shx& a, const Shx& b)
+{
+	if (a.r < b.r)
+		return true;
+	else if (a.r > b.r)
+		return false;
+	else if (a.c < b.c)
+		return true;
+	else
+		return false;
+};
+
+void generate_grid_s_hull(const tPoints &points, struct triangulateio *out) {
+	size_t size = points.size();
+	std::vector<Shx> pts;
+	
+	pts.resize(size);
+
+	
+	
+	for (size_t i = 0; i < size; ++i) {	
+		const auto &p = points[i];		
+		pts[i] = Shx(p.x, p.y);
+		pts[i].id = i;
+	}
+
+	// std::sort(pts.begin(), pts.end(), pointSortPredicate);
+	
+
+
+	memset(out, 0, sizeof(*out));
+	//triangulate("zQ", &in, out, NULL);
+	std::vector<Triad> triads;
+
+	s_hull_pro(pts, triads);
+
+	out->numberofpoints = pts.size();
+	out->numberofpointattributes = 1;
+	out->pointlist = (REAL *)malloc(out->numberofpoints * 2 * sizeof(REAL));
+	out->pointattributelist = (REAL *)malloc(out->numberofpoints * out->numberofpointattributes * sizeof(REAL));
+	
+	for (size_t i = 0; i < out->numberofpoints; ++i) {
+		auto indexDst = i * 2;
+		auto id = pts[i].id;
+		const auto &p = points[i];
+		out->pointlist[indexDst + 0] = p.x;
+		out->pointlist[indexDst + 1] = p.y;
+		out->pointattributelist[i]   = p.z;
+	}
+	out->numberofcorners = 3;
+	out->numberoftriangles = triads.size();
+	out->trianglelist = (int*)malloc(sizeof(int) * out->numberofcorners * out->numberoftriangles);
+	for (size_t i = 0; i < out->numberoftriangles; ++i) {
+		auto index = i * out->numberofcorners;
+		auto tri = triads[i];
+		
+		out->trianglelist[index + 0] = tri.a;
+		out->trianglelist[index + 1] = tri.b;
+		out->trianglelist[index + 2] = tri.c;
+	}
+
+}
 
 void generate_grid(const tPoints &points, struct triangulateio *out) {
-	struct triangulateio in;
+	generate_grid_s_hull(points, out);
+	
+	/*struct triangulateio in;
 	memset(&in, 0, sizeof(in));
 	in.numberofpoints = (int) points.size();
 	in.numberofpointattributes = 1;
@@ -172,7 +220,7 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	triangulate("zQ", &in, out, NULL);
 	
 	free(in.pointattributelist);
-	free(in.pointlist);
+	free(in.pointlist);*/
 }
 
 struct Timing {
@@ -333,6 +381,7 @@ int main(int ac, char **av) {
 			generate_grid(points_result, &mid);
 		}
 
+
 		points_result.clear();
 
 		int pt_count_x = cmdparser.get<int>("simplify-split");
@@ -408,7 +457,8 @@ int main(int ac, char **av) {
 						auto i3 = mid.trianglelist[index + 2];
 
 						vec3 res;
-						if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)) {
+						if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)
+							|| glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i3], points_input[i2], res)) {
 							points_result.push_back(start + direction * res.z);
 							generated = true;
 							break;
@@ -466,17 +516,15 @@ int main(int ac, char **av) {
 			}
 		}
 
-
-
 		{
 			Timing _("7. generating output OBJ");
 			std::string output_file_name = inputs[arg] + ".obj";
 			std::ofstream output(output_file_name.c_str());
 			for (auto i = 0; i < mid.numberofpoints; ++i) {
 				auto index = i * 2;
-				output << std::fixed 
-					<< "v " << (mid.pointlist[index + 0]) 
-					<< "  " << (mid.pointlist[index + 1]) 
+				output << std::fixed
+					<< "v " << (mid.pointlist[index + 0])
+					<< "  " << (mid.pointlist[index + 1])
 					<< "  " << (mid.pointattributelist[i]) << std::endl;
 			}
 
@@ -488,6 +536,9 @@ int main(int ac, char **av) {
 				output << std::endl;
 			}
 		}
+
+
+
 
 		free(mid.pointlist);
 		free(mid.pointattributelist);

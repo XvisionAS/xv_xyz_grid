@@ -23,6 +23,7 @@ workspace "xv_xyz_grid"
 		files {
 			"../Externals/glm/**.hpp",
 			"../Externals/cmdline/**.h",
+			"../Externals/s_hull_pro/*.*",
 			"../xv_xyz_grid.cpp"
 		}
 
