@@ -12,69 +12,78 @@
 #include <glm/gtc/epsilon.hpp>
 #include <glm/gtx/intersect.hpp>
 #include <cmdline/cmdline.h>
-#include <s_hull_pro/s_hull_pro.h>
 
 #if defined(SINGLE)
 typedef float real;
 typedef glm::vec3 vec3;
 #define REAL float
+#define SCANF_FORMAT "%f %f %f"
+#define REAL_MAX FLT_MAX
 #else
 typedef double real;
 typedef glm::dvec3 vec3;
 #define REAL double
+#define SCANF_FORMAT "%lf %lf %lf"
+#define REAL_MAX DBL_MAX
+
 #endif
 
-#define ANSI_DECLARATORS
 #define VOID void
 
-extern "C" {
 #include <triangle/triangle.h>
-}
-// #include "utils.h"
 
-struct AABB {
+#include "AABB.h"
 
-  AABB()
-      : mMin(std::numeric_limits<real>::max()),
-        mMax(-std::numeric_limits<real>::max()) 
-	{}
-
-	AABB(const vec3& mi, const vec3& ma) : mMin(mi), mMax(ma) {
-
-	}
-
-	void offset(const vec3& o) {
-		mMin += o;
-		mMax += o;
-	}
-
-  void add(const vec3 &p) {
-    mMin = glm::min(p, mMin);
-    mMax = glm::max(p, mMax);
-  }
-
-  vec3 len() const { return mMax - mMin; }
-
-  bool contains(const vec3 &p) {
-    return p.x > mMin.x && p.x <= mMax.x && p.y > mMin.y && p.y <= mMax.y &&
-           p.z > mMin.z && p.z <= mMax.z;
-  }
-
-	bool contains(const AABB& bb) {
-		if (bb.mMin.x > mMax.x || bb.mMax.x < mMin.x)
-			return false;
-		else if (bb.mMin.y > mMax.y || bb.mMax.y < mMin.y)
-			return false;
-		else if (bb.mMin.z > mMax.z || bb.mMax.z < mMin.z)
-			return false;
-
-		return true;
-	}
-  vec3 mMin;
-  vec3 mMax;
-};
 
 typedef std::vector<vec3> tPoints;
+
+
+void generate_grid(const tPoints &points, struct triangulateio *out) {
+	struct triangulateio in;
+	memset(&in, 0, sizeof(in));
+	in.numberofpoints = (int) points.size();
+	in.numberofpointattributes = 1;
+
+	in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
+	in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
+
+	for (auto i = 0; i < in.numberofpoints; ++i) {
+		auto indexDst = i * 2;
+		const auto &p = points[i];
+		in.pointlist[indexDst + 0] = p.x;
+		in.pointlist[indexDst + 1] = p.y;
+		// not sure if it should be put somewhere else.
+		in.pointattributelist[i] = p.z;
+	}
+
+	in.numberofsegments = 0;
+	in.numberofholes = 0;
+	in.numberofregions = 0;
+	
+	memset(out, 0, sizeof(*out));
+	triangulate("zQ", &in, out, NULL);
+	
+	free(in.pointattributelist);
+	free(in.pointlist);
+}
+
+struct Timing {
+	Timing(const char* description) {
+		mStart = std::chrono::steady_clock::now();
+		std::cout << description;
+		std::cout.flush();
+
+	}
+
+	~Timing() {
+		auto diff = std::chrono::steady_clock::now() - mStart;
+		auto time = std::chrono::duration_cast<std::chrono::milliseconds>(diff);                                                      
+		std::cout << " [took " << time.count() << " milliseconds]" << std::endl;
+	}
+
+	std::chrono::steady_clock::time_point mStart;
+};
+
 typedef std::vector<uint32_t> tIndices;
 
 struct tNode {
@@ -103,183 +112,31 @@ struct tNode {
 
 
 struct tNodeGrid {
-  tNodeGrid(std::int_fast32_t width, std::int_fast32_t height, const AABB &aabb)
-      : mCoordStart(aabb.mMin), mCoordSize(aabb.len()) {
-    mNodes.resize((width + 1) * (height + 1));
+	tNodeGrid(std::int_fast32_t width, std::int_fast32_t height, const AABB &aabb)
+		: mCoordStart(aabb.mMin), mCoordSize(aabb.len()) {
+		mNodes.resize((width + 1) * (height + 1));
 
-    mGridWidth = width;
-    mGridHeight = height;
-  }
+		mGridWidth = width;
+		mGridHeight = height;
+	}
 
-  tNode &nodeAt(const vec3 &p) {
-    int x = (int)glm::floor(((p.x - mCoordStart.x) / mCoordSize.x) *
-                            (real)(mGridWidth));
-    int y = (int)glm::floor(((p.y - mCoordStart.y) / mCoordSize.y) *
-                            (real)(mGridHeight));
-    return mNodes[x + y * mGridWidth];
-  }
+	tNode &nodeAt(const vec3 &p) {
+		int x = (int)glm::floor(((p.x - mCoordStart.x) / mCoordSize.x) *
+			(real)(mGridWidth));
+		int y = (int)glm::floor(((p.y - mCoordStart.y) / mCoordSize.y) *
+			(real)(mGridHeight));
+		return mNodes[x + y * mGridWidth];
+	}
 
 
-  std::vector<tNode> mNodes;
+	std::vector<tNode> mNodes;
 
-  std::int_fast32_t mGridWidth;
-  std::int_fast32_t mGridHeight;
+	std::int_fast32_t mGridWidth;
+	std::int_fast32_t mGridHeight;
 
-  vec3 mCoordStart;
-  vec3 mCoordSize;
+	vec3 mCoordStart;
+	vec3 mCoordSize;
 };
-
-bool pointSortPredicate(const Shx& a, const Shx& b)
-{
-	if (a.r < b.r)
-		return true;
-	else if (a.r > b.r)
-		return false;
-	else if (a.c < b.c)
-		return true;
-	else
-		return false;
-};
-
-void generate_grid_s_hull(const tPoints &points, struct triangulateio *out) {
-	size_t size = points.size();
-	std::vector<Shx> pts;
-	
-	pts.resize(size);
-
-	
-	
-	for (size_t i = 0; i < size; ++i) {	
-		const auto &p = points[i];		
-		pts[i] = Shx(p.x, p.y);
-		pts[i].id = i;
-	}
-
-	// std::sort(pts.begin(), pts.end(), pointSortPredicate);
-	
-
-
-	memset(out, 0, sizeof(*out));
-	//triangulate("zQ", &in, out, NULL);
-	std::vector<Triad> triads;
-
-	s_hull_pro(pts, triads);
-
-	out->numberofpoints = pts.size();
-	out->numberofpointattributes = 1;
-	out->pointlist = (REAL *)malloc(out->numberofpoints * 2 * sizeof(REAL));
-	out->pointattributelist = (REAL *)malloc(out->numberofpoints * out->numberofpointattributes * sizeof(REAL));
-	
-	for (size_t i = 0; i < out->numberofpoints; ++i) {
-		auto indexDst = i * 2;
-		auto id = pts[i].id;
-		const auto &p = points[i];
-		out->pointlist[indexDst + 0] = p.x;
-		out->pointlist[indexDst + 1] = p.y;
-		out->pointattributelist[i]   = p.z;
-	}
-	out->numberofcorners = 3;
-	out->numberoftriangles = triads.size();
-	out->trianglelist = (int*)malloc(sizeof(int) * out->numberofcorners * out->numberoftriangles);
-	for (size_t i = 0; i < out->numberoftriangles; ++i) {
-		auto index = i * out->numberofcorners;
-		auto tri = triads[i];
-		
-		out->trianglelist[index + 0] = tri.a;
-		out->trianglelist[index + 1] = tri.b;
-		out->trianglelist[index + 2] = tri.c;
-	}
-
-}
-
-void generate_grid(const tPoints &points, struct triangulateio *out) {
-	generate_grid_s_hull(points, out);
-	
-	/*struct triangulateio in;
-	memset(&in, 0, sizeof(in));
-	in.numberofpoints = (int) points.size();
-	in.numberofpointattributes = 1;
-
-	in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
-	in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
-
-	for (auto i = 0; i < in.numberofpoints; ++i) {
-		auto indexDst = i * 2;
-		const auto &p = points[i];
-		in.pointlist[indexDst + 0] = p.x;
-		in.pointlist[indexDst + 1] = p.y;
-		// not sure if it should be put somewhere else.
-		in.pointattributelist[i] = p.z;
-	}
-
-	in.numberofsegments = 0;
-	in.numberofholes = 0;
-	in.numberofregions = 0;
-	
-	memset(out, 0, sizeof(*out));
-	triangulate("zQ", &in, out, NULL);
-	
-	free(in.pointattributelist);
-	free(in.pointlist);*/
-}
-
-struct Timing {
-	Timing(const char* description) {
-		mStart = std::chrono::steady_clock::now();
-		std::cout << description;
-		std::cout.flush();
-
-	}
-
-	~Timing() {
-		auto diff = std::chrono::steady_clock::now() - mStart;
-		auto time = std::chrono::duration_cast<std::chrono::milliseconds>(diff);                                                      
-		std::cout << " [took " << time.count() << " milliseconds]" << std::endl;
-	}
-
-	std::chrono::steady_clock::time_point mStart;
-};
-
-void generate_test_grid() {
-	std::ofstream output("test.xyz");
-
-	vec3 min(-100, -100, 100);
-	vec3 max(100, 100, 200);
-	const int grid_width = 8;
-	const int grid_height = 8;
-	vec3 delta = (max - min) / vec3(grid_width, grid_height, 1);
-
-	for (int y = 0; y < grid_height; ++y) {
-		for (int x = 0; x < grid_width; ++x) {
-			vec3 pt = min + delta * vec3(x, y, 1);
-			pt.z = min.z + ((1 + glm::cos(((real)(x + y) / (real)grid_width) * glm::two_pi<real>()) ) * (real) 0.5) * delta.z;
-			output << pt.x << " " << pt.y << " " << pt.z << std::endl;
-		}
-	}
-}
-
-void output_grid(int* triangles, tPoints& points, tNodeGrid& nodes) {
-	std::ofstream output("debug.obj");
-	int index = 0;
-	output << "g " << std::endl;
-	for (auto& v : points) {
-		output << "v " << v.x << " " << v.y << " " << v.z << std::endl;
-	}
-
-	for (auto& node : nodes.mNodes) {
-		if (!node.indices.empty()) {
-			output << "g node" << index++ << std::endl;
-
-			for (auto& i : node.indices) {
-				auto i1 = triangles[i] + 1;
-				auto i2 = triangles[i + 1] + 1;
-				auto i3 = triangles[i + 2] + 1;
-
-				output << "f " << i1 << " " << i2 << " " << i3 << std::endl;
-			}
-		}
-	}
-}
 
 template <typename OUT, typename T>
 bool write_binary(std::ofstream& out, T& value) {
@@ -323,7 +180,8 @@ int main(int ac, char **av) {
 	cmdparser.parse_check(ac, av);
 	setlocale(LC_ALL, "C");
 
-	auto &inputs = cmdparser.rest();
+	auto&	inputs = cmdparser.rest();
+	int		split = cmdparser.get<int>("simplify-split");
 
 	
 	for (size_t arg = 0; arg < inputs.size(); arg++) {
@@ -331,12 +189,11 @@ int main(int ac, char **av) {
 		tPoints points_result;
 		AABB aabb;
 
-
-		std::cout << "** processing " << inputs[arg] << std::endl;
-
 		{
-			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets");
+			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets, compute AABB");
 			std::ifstream input(inputs[arg]);
+			std::ofstream output(inputs[arg] + ".bin", std::ios::binary | std::ios::out);
+
 			vec3 p;
 			for (std::string line; std::getline(input, line); ) {
 				size_t comment = line.find("#");
@@ -344,45 +201,15 @@ int main(int ac, char **av) {
 					if (comment != std::string::npos) {
 						line = line.substr(0, comment);
 					}
-					if (std::sscanf(line.c_str(), "%f %f %f", &p.x, &p.y, &p.z) == 3) {
-						points_input.push_back(p);
+					if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
+						output.write((char*) &p, sizeof(p));
 						aabb.add(p);
 					}
 				}
 			}
 		}
+
 		vec3 len = aabb.len();
-
-
-		{
-			Timing _("2. removing duplicate points");
-
-			const int cNodeGridWidth = 256;
-			const int cNodeGridHeight = 256;
-
-			points_result.reserve(points_input.size());
-			auto size = points_input.size();
-			tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
-			for (auto &p : points_input) {
-				tNode &node = grid.nodeAt(p);
-				if (!node.find_point(points_result, p)) {
-					node.indices.push_back((uint32_t) points_result.size());
-					points_result.push_back(p);
-				}
-			}
-		}
-
-
-		points_input.clear();
-		struct triangulateio mid;
-
-		{
-			Timing _("3. triangulation of the dataset");
-			generate_grid(points_result, &mid);
-		}
-
-
-		points_result.clear();
 
 		int pt_count_x = cmdparser.get<int>("simplify-split");
 		int pt_count_y = pt_count_x;
@@ -393,8 +220,92 @@ int main(int ac, char **av) {
 			pt_count_x = glm::min<int>(pt_count_x, pt_count_y);
 		}
 
-		std::cout << "** simplification grid size " << pt_count_x << " * " << pt_count_y << std::endl;
+		std::vector<real>	value;
+		
 
+		value.resize(pt_count_x * pt_count_y, 0);
+		
+		{
+			Timing _("2. converts point to a bitmap");
+			
+			std::vector<real>	count;
+			count.resize(value.size(), 0);
+			vec3 ratio = vec3(pt_count_x - 1, pt_count_y - 1, 1) / len;		
+			std::ifstream input(inputs[arg] + ".bin", std::ios::binary |  std::ios::in);
+			vec3 p;
+			
+			while (input.read((char*)&p, sizeof(p))) {
+				real x = (p.x - aabb.mMin.x) * ratio.x;
+				real y = (p.y - aabb.mMin.y) * ratio.y;
+
+				int		px = (int)x;
+				int   py = (int)y;
+				
+				int   nx = px + 1;
+				int   ny = py + 1;
+
+				real nfx = (x - (real) px);
+				real nfy = (y - (real) py);
+
+				real pfx = 1 - nfx;
+				real pfy = 1 - nfy;
+
+				real s = pfx * pfy;
+				if (nx < pt_count_x) {
+					count[px + py * pt_count_x] += s;
+					value[px + py * pt_count_x] += (p.z * s);
+				}
+				
+				s = nfx * pfy;
+				if (nx < pt_count_x) {
+					count[nx + py * pt_count_x] += s;
+					value[nx + py * pt_count_x] += (p.z * s);
+				}
+				
+				s = nfx * nfy;
+				if (ny < pt_count_y) {
+					count[nx + ny * pt_count_x] += s;
+					value[nx + ny * pt_count_x] += (p.z * s);
+				}
+				s = pfx * nfy;
+				if (ny < pt_count_y) {
+					count[px + ny * pt_count_x] += s;
+					value[px + ny * pt_count_x] += (p.z * s);
+				}
+			}			
+			size_t  size = value.size();
+			int			empty = 0;
+			for (size_t i = 0; i < size; ++i) {
+				real c = count[i];
+				if (c > 0) {
+					value[i] /= count[i];
+				} else {
+					value[i] = REAL_MAX;
+				}
+			}			
+		}
+		struct triangulateio mid;
+		{
+			Timing _("3. generating grid from bitmap points");
+			size_t size = value.size();
+			points_input.clear();
+			points_input.reserve(size);
+
+			vec3 ratio = len / vec3(pt_count_x - 1, pt_count_y - 1, 1);
+			for (int i = 0; i < size; ++i) {
+				real v = value[i];
+				if (v != REAL_MAX) {
+					int y = i / pt_count_x;
+					int x = i - (y * pt_count_x);
+
+					points_input.push_back(vec3(x * ratio.x + aabb.mMin.x, y * ratio.y + aabb.mMin.y, value[i]));
+				}
+			}
+			
+			generate_grid(points_input, &mid);
+			points_input.clear();					
+		}
+		
 		{
 			const int cNodeGridWidth = 16;
 			const int cNodeGridHeight = 16;
@@ -431,64 +342,49 @@ int main(int ac, char **av) {
 					}
 				}
 			}
-
-
-			// output_grid(mid.trianglelist, points_input, grid);
-
-
 			vec3 direction(0, 0, -1);
 			vec3 start(0, 0, glm::abs(aabb.mMax.z) * 2);
-			real delta_x = len.x / (real)(pt_count_x + 1);
-			real delta_y = len.y / (real)(pt_count_y + 1);
+			
+			real delta_x = len.x / (real)(pt_count_x - 1);
+			real delta_y = len.y / (real)(pt_count_y - 1);
 			bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
-			real previous = cmdparser.get<bool>("simplify-use-min") ? glm::min(aabb.mMin.z, aabb.mMax.z) : glm::max(aabb.mMin.z, aabb.mMax.z);
-			bool use_previous = !(cmdparser.get<bool>("simplify-use-min") | cmdparser.get<bool>("simplify-use-max"));
+			real minZ = glm::abs(aabb.mMin.z);
+			real maxZ = glm::abs(aabb.mMax.z);
 
+			real missing = cmdparser.get<bool>("simplify-use-max") ? glm::max(minZ, maxZ) : glm::min(minZ, maxZ);
+			
+			points_result.reserve(pt_count_x * pt_count_y);
 			for (int y = 0; y < pt_count_y; ++y) {
 				for (int x = 0; x < pt_count_x; ++x) {
+					int index = y * pt_count_x + x;
 					start.x = aabb.mMin.x + x * delta_x;
 					start.y = aabb.mMin.y + y * delta_y;
+					
+					if (value[index] == REAL_MAX) {
+						tNode &node = grid.nodeAt(start);
+						bool generated = false;
+						for (auto index : node.indices) {
+							auto i1 = mid.trianglelist[index + 0];
+							auto i2 = mid.trianglelist[index + 1];
+							auto i3 = mid.trianglelist[index + 2];
 
-					tNode &node = grid.nodeAt(start);
-					bool generated = false;
-					for (auto index : node.indices) {
-						auto i1 = mid.trianglelist[index + 0];
-						auto i2 = mid.trianglelist[index + 1];
-						auto i3 = mid.trianglelist[index + 2];
+							vec3 res;
+							if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)) {
+								points_result.push_back(start + direction * res.z);
+								generated = true;
+								break;
+							}
+						}
 
-						vec3 res;
-						if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)
-							|| glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i3], points_input[i2], res)) {
-							points_result.push_back(start + direction * res.z);
-							generated = true;
-							break;
+						if (generate_missing && !generated) {
+							points_result.push_back(vec3(start.x, start.y, missing));
 						}
 					}
-
-					if (generate_missing && !generated) {
-						if (use_previous) {
-							size_t index = y * pt_count_x + x;
-							if (y > 0) {
-								previous = points_result[index - pt_count_x].z;
-							}
-							else if (x > 0) {
-								previous = points_result[index - 1].z;
-							}
-						}
-						points_result.push_back(vec3(start.x, start.y, previous));
+					else {
+						points_result.push_back(vec3(start.x, start.y, value[index]));
 					}
 				}
 			}
-		}
-
-		free(mid.pointlist);
-		free(mid.pointattributelist);
-		free(mid.pointmarkerlist);
-		free(mid.trianglelist);
-	
-		{
-			Timing _("5. tesselation of the simplified dataset");
-			generate_grid(points_result, &mid);
 		}
 
 		{
@@ -501,7 +397,7 @@ int main(int ac, char **av) {
 			write_binary<int>(output, pt_count_x);
 			write_binary<int>(output, pt_count_y);
 
-			float min = aabb.mMin.x;
+			real min = aabb.mMin.x;
 			write_binary<float>(output, aabb.mMin.x);
 			write_binary<float>(output, aabb.mMin.y);
 			write_binary<float>(output, aabb.mMin.z);
@@ -511,7 +407,10 @@ int main(int ac, char **av) {
 			write_binary<float>(output, aabb.mMax.z);
 
 			for (auto& v : points_result) {
-				float z = -v.z;
+				real z = v.z;
+				if (z > 0) {
+					z = -z;
+				}
 				write_binary<float>(output, z);
 			}
 		}
@@ -537,13 +436,194 @@ int main(int ac, char **av) {
 			}
 		}
 
-
-
-
 		free(mid.pointlist);
 		free(mid.pointattributelist);
 		free(mid.pointmarkerlist);
 		free(mid.trianglelist);
+
+
+		////{
+		////	Timing _("2. removing duplicate points");
+
+		////	const int cNodeGridWidth = 256;
+		////	const int cNodeGridHeight = 256;
+
+		////	points_result.reserve(points_input.size());
+		////	auto size = points_input.size();
+		////	tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
+		////	for (auto &p : points_input) {
+		////		tNode &node = grid.nodeAt(p);
+		////		if (!node.find_point(points_result, p)) {
+		////			node.indices.push_back((uint32_t) points_result.size());
+		////			points_result.push_back(p);
+		////		}
+		////	}
+		////}
+
+
+		//points_input.clear();
+		//struct triangulateio mid;
+
+		//{
+		//	Timing _("3. triangulation of the dataset");
+		//	generate_grid(points_result, &mid);
+		//}
+
+
+		//points_result.clear();
+
+
+		//std::cout << "** simplification grid size " << pt_count_x << " * " << pt_count_y << std::endl;
+
+		//{
+		//	const int cNodeGridWidth = 16;
+		//	const int cNodeGridHeight = 16;
+
+		//	Timing _("4. generation of the simplified dataset");
+		//	tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
+
+		//	for (auto i = 0; i < mid.numberofpoints; ++i) {
+		//		auto index = i * 2;
+		//		points_input.push_back(vec3(mid.pointlist[index + 0], mid.pointlist[index + 1], mid.pointattributelist[i]));
+		//	}
+
+		//	for (auto i = 0; i < mid.numberoftriangles; i++) {
+		//		auto index = i * mid.numberofcorners;
+
+		//		auto i1 = mid.trianglelist[index + 0];
+		//		auto i2 = mid.trianglelist[index + 1];
+		//		auto i3 = mid.trianglelist[index + 2];
+
+		//		AABB tri_bbox;
+		//		tri_bbox.add(points_input[i1]);
+		//		tri_bbox.add(points_input[i2]); 
+		//		tri_bbox.add(points_input[i3]);
+
+		//		vec3 grid_delta = grid.mCoordSize / (vec3(grid.mGridWidth, grid.mGridHeight, 1));
+		//		for (int y = 0; y < grid.mGridHeight; ++y) {
+		//			for (int x = 0; x < grid.mGridWidth; ++x) {
+		//				AABB aabb(grid.mCoordStart, grid.mCoordStart + grid_delta);
+		//				aabb.offset(grid_delta * vec3(x, y, 0));
+		//				if (aabb.contains(tri_bbox)) {
+		//					auto node_index = x + y * grid.mGridWidth;
+		//					grid.mNodes[node_index].indices.push_back(index);
+		//				}
+		//			}
+		//		}
+		//	}
+
+
+		//	// output_grid(mid.trianglelist, points_input, grid);
+
+
+		//	vec3 direction(0, 0, -1);
+		//	vec3 start(0, 0, glm::abs(aabb.mMax.z) * 2);
+		//	real delta_x = len.x / (real)(pt_count_x + 1);
+		//	real delta_y = len.y / (real)(pt_count_y + 1);
+		//	bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
+		//	real previous = cmdparser.get<bool>("simplify-use-min") ? glm::min(aabb.mMin.z, aabb.mMax.z) : glm::max(aabb.mMin.z, aabb.mMax.z);
+		//	bool use_previous = !(cmdparser.get<bool>("simplify-use-min") | cmdparser.get<bool>("simplify-use-max"));
+
+		//	for (int y = 0; y < pt_count_y; ++y) {
+		//		for (int x = 0; x < pt_count_x; ++x) {
+		//			start.x = aabb.mMin.x + x * delta_x;
+		//			start.y = aabb.mMin.y + y * delta_y;
+
+		//			tNode &node = grid.nodeAt(start);
+		//			bool generated = false;
+		//			for (auto index : node.indices) {
+		//				auto i1 = mid.trianglelist[index + 0];
+		//				auto i2 = mid.trianglelist[index + 1];
+		//				auto i3 = mid.trianglelist[index + 2];
+
+		//				vec3 res;
+		//				if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)
+		//					|| glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i3], points_input[i2], res)) {
+		//					points_result.push_back(start + direction * res.z);
+		//					generated = true;
+		//					break;
+		//				}
+		//			}
+
+		//			if (generate_missing && !generated) {
+		//				if (use_previous) {
+		//					size_t index = y * pt_count_x + x;
+		//					if (y > 0) {
+		//						previous = points_result[index - pt_count_x].z;
+		//					}
+		//					else if (x > 0) {
+		//						previous = points_result[index - 1].z;
+		//					}
+		//				}
+		//				points_result.push_back(vec3(start.x, start.y, previous));
+		//			}
+		//		}
+		//	}
+		//}
+
+		//free(mid.pointlist);
+		//free(mid.pointattributelist);
+		//free(mid.pointmarkerlist);
+		//free(mid.trianglelist);
+	
+		//{
+		//	Timing _("5. tesselation of the simplified dataset");
+		//	generate_grid(points_result, &mid);
+		//}
+
+		//{
+		//	Timing _("6. generating output XVB");
+
+		//	std::string		output_file_name = inputs[arg] + ".xvb";
+		//	std::ofstream output(output_file_name.c_str(), std::ios_base::binary | std::ios_base::trunc);
+		//		
+
+		//	write_binary<int>(output, pt_count_x);
+		//	write_binary<int>(output, pt_count_y);
+
+		//	float min = aabb.mMin.x;
+		//	write_binary<float>(output, aabb.mMin.x);
+		//	write_binary<float>(output, aabb.mMin.y);
+		//	write_binary<float>(output, aabb.mMin.z);
+
+		//	write_binary<float>(output, aabb.mMax.x);
+		//	write_binary<float>(output, aabb.mMax.y);
+		//	write_binary<float>(output, aabb.mMax.z);
+
+		//	for (auto& v : points_result) {
+		//		float z = -v.z;
+		//		write_binary<float>(output, z);
+		//	}
+		//}
+
+		//{
+		//	Timing _("7. generating output OBJ");
+		//	std::string output_file_name = inputs[arg] + ".obj";
+		//	std::ofstream output(output_file_name.c_str());
+		//	for (auto i = 0; i < mid.numberofpoints; ++i) {
+		//		auto index = i * 2;
+		//		output << std::fixed
+		//			<< "v " << (mid.pointlist[index + 0])
+		//			<< "  " << (mid.pointlist[index + 1])
+		//			<< "  " << (mid.pointattributelist[i]) << std::endl;
+		//	}
+
+		//	for (auto i = 0; i < mid.numberoftriangles; i++) {
+		//		output << "f ";
+		//		for (auto j = 0; j < mid.numberofcorners; j++) {
+		//			output << mid.trianglelist[i * mid.numberofcorners + j] + 1 << " ";
+		//		}
+		//		output << std::endl;
+		//	}
+		//}
+
+
+
+
+		//free(mid.pointlist);
+		//free(mid.pointattributelist);
+		//free(mid.pointmarkerlist);
+		//free(mid.trianglelist);
 	}	
   return 0;
 }

@@ -6,25 +6,22 @@ workspace "xv_xyz_grid"
 
   configurations {"Debug", "Release"}
 	defines { "GLM_FORCE_RADIANS" }
-	defines     { "SINGLE", "TRILIBRARY", "NO_TIMER", "TRILIBRARY_x64" }
+	defines     { "TRILIBRARY", "NO_TIMER", "TRILIBRARY_x64", "ANSI_DECLARATORS" }
 	filter "action:vs*"
 		defines     { "_CRT_SECURE_NO_WARNINGS" }
 
   project "xv_xyz_grid"
     kind "ConsoleApp"
 
-		language "C"
-			files {
-				"../Externals/triangle/**.c",
-				"../Externals/triangle/**.h"
-			}
 
 		language "C++"
 		files {
+			"../Externals/triangle/**.cc",
+			"../Externals/triangle/**.h",
 			"../Externals/glm/**.hpp",
-			"../Externals/cmdline/**.h",
-			"../Externals/s_hull_pro/*.*",
-			"../xv_xyz_grid.cpp"
+			"../Externals/cmdline/**.h",			
+			"../*.h",
+			"../*.cpp"
 		}
 
 		includedirs {
