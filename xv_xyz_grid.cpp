@@ -189,13 +189,13 @@ int main(int ac, char **av) {
 		tPoints points_result;
 		AABB aabb;
 
+		size_t point_count = 0;
 		{
 			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets, compute AABB");
 			std::ifstream input(inputs[arg]);
 			std::ofstream output(inputs[arg] + ".bin", std::ios::binary | std::ios::out);
 
 			vec3 p;
-			size_t count = 0;
 			for (std::string line; std::getline(input, line); ) {
 				size_t comment = line.find("#");
 				if (comment > 0) {
@@ -203,16 +203,17 @@ int main(int ac, char **av) {
 						line = line.substr(0, comment);
 					}
 					if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
-						count++;
+						point_count++;
 						output.write((char*) &p, sizeof(p));
 						aabb.add(p);
 					}
 				}
 			}
-			if (count == 0) {
-				std::cout << "Was not able to read any data." << std::endl;
-				return -1;
-			}
+		}
+
+		if (point_count == 0) {
+			std::cout << "Was not able to read any data." << std::endl;
+			return -1;
 		}
 
 		vec3 len = aabb.len();
