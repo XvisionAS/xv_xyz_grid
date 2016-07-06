@@ -23,7 +23,7 @@ typedef glm::vec3 vec3;
 typedef double real;
 typedef glm::dvec3 vec3;
 #define REAL double
-#define SCANF_FORMAT "%lf %lf %lf"
+#define SCANF_FORMAT " %lf%*[ \t,;] %lf%*[ \t,;] %lf %*[\n]"
 #define REAL_MAX DBL_MAX
 
 #endif
@@ -195,6 +195,7 @@ int main(int ac, char **av) {
 			std::ofstream output(inputs[arg] + ".bin", std::ios::binary | std::ios::out);
 
 			vec3 p;
+			size_t count = 0;
 			for (std::string line; std::getline(input, line); ) {
 				size_t comment = line.find("#");
 				if (comment > 0) {
@@ -202,14 +203,24 @@ int main(int ac, char **av) {
 						line = line.substr(0, comment);
 					}
 					if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
+						count++;
 						output.write((char*) &p, sizeof(p));
 						aabb.add(p);
 					}
 				}
 			}
+			if (count == 0) {
+				std::cout << "Was not able to read any data." << std::endl;
+				return -1;
+			}
 		}
 
 		vec3 len = aabb.len();
+		
+		if (glm::length(len) < glm::epsilon<real>()) {
+			std::cout << "Dataset is empty." << std::endl;
+			return -2;
+		}
 
 		int pt_count_x = cmdparser.get<int>("simplify-split");
 		int pt_count_y = pt_count_x;
@@ -439,191 +450,7 @@ int main(int ac, char **av) {
 		free(mid.pointlist);
 		free(mid.pointattributelist);
 		free(mid.pointmarkerlist);
-		free(mid.trianglelist);
-
-
-		////{
-		////	Timing _("2. removing duplicate points");
-
-		////	const int cNodeGridWidth = 256;
-		////	const int cNodeGridHeight = 256;
-
-		////	points_result.reserve(points_input.size());
-		////	auto size = points_input.size();
-		////	tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
-		////	for (auto &p : points_input) {
-		////		tNode &node = grid.nodeAt(p);
-		////		if (!node.find_point(points_result, p)) {
-		////			node.indices.push_back((uint32_t) points_result.size());
-		////			points_result.push_back(p);
-		////		}
-		////	}
-		////}
-
-
-		//points_input.clear();
-		//struct triangulateio mid;
-
-		//{
-		//	Timing _("3. triangulation of the dataset");
-		//	generate_grid(points_result, &mid);
-		//}
-
-
-		//points_result.clear();
-
-
-		//std::cout << "** simplification grid size " << pt_count_x << " * " << pt_count_y << std::endl;
-
-		//{
-		//	const int cNodeGridWidth = 16;
-		//	const int cNodeGridHeight = 16;
-
-		//	Timing _("4. generation of the simplified dataset");
-		//	tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
-
-		//	for (auto i = 0; i < mid.numberofpoints; ++i) {
-		//		auto index = i * 2;
-		//		points_input.push_back(vec3(mid.pointlist[index + 0], mid.pointlist[index + 1], mid.pointattributelist[i]));
-		//	}
-
-		//	for (auto i = 0; i < mid.numberoftriangles; i++) {
-		//		auto index = i * mid.numberofcorners;
-
-		//		auto i1 = mid.trianglelist[index + 0];
-		//		auto i2 = mid.trianglelist[index + 1];
-		//		auto i3 = mid.trianglelist[index + 2];
-
-		//		AABB tri_bbox;
-		//		tri_bbox.add(points_input[i1]);
-		//		tri_bbox.add(points_input[i2]); 
-		//		tri_bbox.add(points_input[i3]);
-
-		//		vec3 grid_delta = grid.mCoordSize / (vec3(grid.mGridWidth, grid.mGridHeight, 1));
-		//		for (int y = 0; y < grid.mGridHeight; ++y) {
-		//			for (int x = 0; x < grid.mGridWidth; ++x) {
-		//				AABB aabb(grid.mCoordStart, grid.mCoordStart + grid_delta);
-		//				aabb.offset(grid_delta * vec3(x, y, 0));
-		//				if (aabb.contains(tri_bbox)) {
-		//					auto node_index = x + y * grid.mGridWidth;
-		//					grid.mNodes[node_index].indices.push_back(index);
-		//				}
-		//			}
-		//		}
-		//	}
-
-
-		//	// output_grid(mid.trianglelist, points_input, grid);
-
-
-		//	vec3 direction(0, 0, -1);
-		//	vec3 start(0, 0, glm::abs(aabb.mMax.z) * 2);
-		//	real delta_x = len.x / (real)(pt_count_x + 1);
-		//	real delta_y = len.y / (real)(pt_count_y + 1);
-		//	bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
-		//	real previous = cmdparser.get<bool>("simplify-use-min") ? glm::min(aabb.mMin.z, aabb.mMax.z) : glm::max(aabb.mMin.z, aabb.mMax.z);
-		//	bool use_previous = !(cmdparser.get<bool>("simplify-use-min") | cmdparser.get<bool>("simplify-use-max"));
-
-		//	for (int y = 0; y < pt_count_y; ++y) {
-		//		for (int x = 0; x < pt_count_x; ++x) {
-		//			start.x = aabb.mMin.x + x * delta_x;
-		//			start.y = aabb.mMin.y + y * delta_y;
-
-		//			tNode &node = grid.nodeAt(start);
-		//			bool generated = false;
-		//			for (auto index : node.indices) {
-		//				auto i1 = mid.trianglelist[index + 0];
-		//				auto i2 = mid.trianglelist[index + 1];
-		//				auto i3 = mid.trianglelist[index + 2];
-
-		//				vec3 res;
-		//				if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)
-		//					|| glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i3], points_input[i2], res)) {
-		//					points_result.push_back(start + direction * res.z);
-		//					generated = true;
-		//					break;
-		//				}
-		//			}
-
-		//			if (generate_missing && !generated) {
-		//				if (use_previous) {
-		//					size_t index = y * pt_count_x + x;
-		//					if (y > 0) {
-		//						previous = points_result[index - pt_count_x].z;
-		//					}
-		//					else if (x > 0) {
-		//						previous = points_result[index - 1].z;
-		//					}
-		//				}
-		//				points_result.push_back(vec3(start.x, start.y, previous));
-		//			}
-		//		}
-		//	}
-		//}
-
-		//free(mid.pointlist);
-		//free(mid.pointattributelist);
-		//free(mid.pointmarkerlist);
-		//free(mid.trianglelist);
-	
-		//{
-		//	Timing _("5. tesselation of the simplified dataset");
-		//	generate_grid(points_result, &mid);
-		//}
-
-		//{
-		//	Timing _("6. generating output XVB");
-
-		//	std::string		output_file_name = inputs[arg] + ".xvb";
-		//	std::ofstream output(output_file_name.c_str(), std::ios_base::binary | std::ios_base::trunc);
-		//		
-
-		//	write_binary<int>(output, pt_count_x);
-		//	write_binary<int>(output, pt_count_y);
-
-		//	float min = aabb.mMin.x;
-		//	write_binary<float>(output, aabb.mMin.x);
-		//	write_binary<float>(output, aabb.mMin.y);
-		//	write_binary<float>(output, aabb.mMin.z);
-
-		//	write_binary<float>(output, aabb.mMax.x);
-		//	write_binary<float>(output, aabb.mMax.y);
-		//	write_binary<float>(output, aabb.mMax.z);
-
-		//	for (auto& v : points_result) {
-		//		float z = -v.z;
-		//		write_binary<float>(output, z);
-		//	}
-		//}
-
-		//{
-		//	Timing _("7. generating output OBJ");
-		//	std::string output_file_name = inputs[arg] + ".obj";
-		//	std::ofstream output(output_file_name.c_str());
-		//	for (auto i = 0; i < mid.numberofpoints; ++i) {
-		//		auto index = i * 2;
-		//		output << std::fixed
-		//			<< "v " << (mid.pointlist[index + 0])
-		//			<< "  " << (mid.pointlist[index + 1])
-		//			<< "  " << (mid.pointattributelist[i]) << std::endl;
-		//	}
-
-		//	for (auto i = 0; i < mid.numberoftriangles; i++) {
-		//		output << "f ";
-		//		for (auto j = 0; j < mid.numberofcorners; j++) {
-		//			output << mid.trianglelist[i * mid.numberofcorners + j] + 1 << " ";
-		//		}
-		//		output << std::endl;
-		//	}
-		//}
-
-
-
-
-		//free(mid.pointlist);
-		//free(mid.pointattributelist);
-		//free(mid.pointmarkerlist);
-		//free(mid.trianglelist);
+		free(mid.trianglelist);		
 	}	
   return 0;
 }
