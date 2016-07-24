@@ -177,6 +177,12 @@ int main(int ac, char **av) {
 		false,
 		false);
 
+	cmdparser.add<bool>("always-negate",
+		'f',
+		"Depth value will always be set to negative value",
+		false,
+		true);
+
 	cmdparser.parse_check(ac, av);
 	setlocale(LC_ALL, "C");
 
@@ -404,8 +410,20 @@ int main(int ac, char **av) {
 
 			std::string		output_file_name = inputs[arg] + ".xvb";
 			std::ofstream output(output_file_name.c_str(), std::ios_base::binary | std::ios_base::trunc);
-				
 
+
+			if (cmdparser.get<bool>("always-negate")) {
+				aabb.reset();
+				for (auto& v : points_result) {
+					if (v.z > 0) {
+						v.z = -v.z;
+					}
+					aabb.add(v);
+				}
+			}
+			for (auto& v : points_result) {
+			}
+			
 			write_binary<int>(output, pt_count_x);
 			write_binary<int>(output, pt_count_y);
 

@@ -1,2 +1,3 @@
 build
 !Platforms\premake5.exe
+.vscode

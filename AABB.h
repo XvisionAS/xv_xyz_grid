@@ -11,6 +11,10 @@ struct AABB {
 	AABB(const vec3& mi, const vec3& ma) : mMin(mi), mMax(ma) {
 
 	}
+	void reset() {
+		mMin = vec3(std::numeric_limits<real>::max());
+		mMax = -mMin;
+	}
 
 	void offset(const vec3& o) {
 		mMin += o;
