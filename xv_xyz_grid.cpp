@@ -61,7 +61,7 @@ void generate_grid(const tPoints &points, struct triangulateio *out) {
 	in.numberofregions = 0;
 	
 	memset(out, 0, sizeof(*out));
-	triangulate("zQ", &in, out, NULL);
+	triangulate((char*)"zQ", &in, out, NULL);
 	
 	free(in.pointattributelist);
 	free(in.pointlist);
@@ -182,6 +182,12 @@ int main(int ac, char **av) {
 		"Depth value will always be set to negative value",
 		false,
 		true);
+
+	cmdparser.add<bool>("generate-obj",
+		'g',
+		"Generate an OBJ file of the generated mesh",
+		false,
+		false);
 
 	cmdparser.parse_check(ac, av);
 	setlocale(LC_ALL, "C");
@@ -434,11 +440,11 @@ int main(int ac, char **av) {
 			write_binary<float>(output, aabb.mMax.z);
 
 			for (auto& v : points_result) {
-				write_binary<float>(output, z);
+				write_binary<float>(output, v.z);
 			}
 		}
 
-		{
+		if (cmdparser.get<bool>("generate-obj")) {
 			Timing _("7. generating output OBJ");
 			std::string output_file_name = inputs[arg] + ".obj";
 			std::ofstream output(output_file_name.c_str());
