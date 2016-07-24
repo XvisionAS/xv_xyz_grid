@@ -427,7 +427,6 @@ int main(int ac, char **av) {
 			write_binary<int>(output, pt_count_x);
 			write_binary<int>(output, pt_count_y);
 
-			real min = aabb.mMin.x;
 			write_binary<float>(output, aabb.mMin.x);
 			write_binary<float>(output, aabb.mMin.y);
 			write_binary<float>(output, aabb.mMin.z);
@@ -437,10 +436,6 @@ int main(int ac, char **av) {
 			write_binary<float>(output, aabb.mMax.z);
 
 			for (auto& v : points_result) {
-				real z = v.z;
-				if (z > 0) {
-					z = -z;
-				}
 				write_binary<float>(output, z);
 			}
 		}
