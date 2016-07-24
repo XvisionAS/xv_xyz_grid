@@ -421,8 +421,6 @@ int main(int ac, char **av) {
 					aabb.add(v);
 				}
 			}
-			for (auto& v : points_result) {
-			}
 			
 			write_binary<int>(output, pt_count_x);
 			write_binary<int>(output, pt_count_y);
