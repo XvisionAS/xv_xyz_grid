@@ -13,6 +13,13 @@
 #include <glm/gtx/intersect.hpp>
 #include <cmdline/cmdline.h>
 
+#ifdef _WIN32
+#include <io.h> 
+#define access    _access_s
+#else
+#include <unistd.h>
+#endif
+
 #if defined(SINGLE)
 typedef float real;
 typedef glm::vec3 vec3;
@@ -145,6 +152,10 @@ bool write_binary(std::ofstream& out, T& value) {
 }
 
 
+bool file_exists(const std::string &Filename)
+{
+	return access(Filename.c_str(), 0) == 0;
+}
 
 int main(int ac, char **av) {
 	cmdline::parser cmdparser;
@@ -202,6 +213,7 @@ int main(int ac, char **av) {
 		AABB aabb;
 
 		size_t point_count = 0;
+		if (!file_exists(inputs[arg] + ".bin"))
 		{
 			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets, compute AABB");
 			std::ifstream input(inputs[arg]);
@@ -221,9 +233,17 @@ int main(int ac, char **av) {
 					}
 				}
 			}
+		} else {
+			Timing _("1. loads points ( from cached binary ), this can take a bit of time ( and memory ) depending on the size of the datasets, compute AABB");
+			std::ifstream input(inputs[arg] + ".bin", std::ios::binary | std::ios::in);
+			vec3 p;
+			while (input.read((char*)&p, sizeof(p))) {
+				aabb.add(p);
+				point_count++;
+			}
 		}
 
-		if (point_count == 0) {
+		if (point_count == 0) {			
 			std::cout << "Was not able to read any data." << std::endl;
 			return -1;
 		}
@@ -296,7 +316,7 @@ int main(int ac, char **av) {
 					count[px + ny * pt_count_x] += s;
 					value[px + ny * pt_count_x] += (p.z * s);
 				}
-			}			
+			}
 			size_t  size = value.size();
 			int			empty = 0;
 			for (size_t i = 0; i < size; ++i) {
@@ -308,6 +328,8 @@ int main(int ac, char **av) {
 				}
 			}			
 		}
+		
+
 		struct triangulateio mid;
 		{
 			Timing _("3. generating grid from bitmap points");
@@ -318,11 +340,14 @@ int main(int ac, char **av) {
 			vec3 ratio = len / vec3(pt_count_x - 1, pt_count_y - 1, 1);
 			for (int i = 0; i < size; ++i) {
 				real v = value[i];
-				if (v != REAL_MAX) {
-					int y = i / pt_count_x;
-					int x = i - (y * pt_count_x);
+				int y = i / pt_count_x;
+				int x = i - (y * pt_count_x);
 
+				if (v != REAL_MAX) {
 					points_input.push_back(vec3(x * ratio.x + aabb.mMin.x, y * ratio.y + aabb.mMin.y, value[i]));
+				}
+				else {
+					points_input.push_back(vec3(x * ratio.x + aabb.mMin.x, y * ratio.y + aabb.mMin.y, aabb.mMin.z));
 				}
 			}
 			

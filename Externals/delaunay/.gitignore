@@ -1,7 +1,0 @@
-test
-delaunay
-*.swp
-build/
-peda-session-delaunay.txt
-*.lua
-.gdb_history
