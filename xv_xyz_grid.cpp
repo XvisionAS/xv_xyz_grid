@@ -96,10 +96,10 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
 }
 
 
-void process_xyz_to_bin(process_t& process, const std::string& input, const std::string& output) {
-	if (!file_exists(output)) {
-		std::ifstream input(input);
-		std::ofstream output(output, std::ios::binary | std::ios::out);
+void process_xyz_to_bin(process_t& process, const std::string& inputFileName, const std::string& outputFileName) {
+	if (!file_exists(outputFileName)) {
+		std::ifstream input(inputFileName);
+		std::ofstream output(outputFileName, std::ios::binary | std::ios::out);
 
 		process.point_count = 0;
 		for (std::string line; std::getline(input, line); ) {
@@ -270,7 +270,6 @@ void process_bitmap_negate(process_t& process) {
 
 void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
 
-
 	std::ofstream output(outputFile.c_str(), std::ios_base::binary | std::ios_base::trunc);
 
 	write_binary<int>(output, process.bitmap_width);
@@ -285,7 +284,8 @@ void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
 	write_binary<float>(output, process.aabb.mMax.z);
 
 	for (auto& v : process.bitmap) {
-		write_binary<float>(output, v);
+		real d = (v == REAL_MAX) ? (process.aabb.mMin.z * 2.0f) : v;
+		write_binary<float>(output, d);
 	}
 }
 
