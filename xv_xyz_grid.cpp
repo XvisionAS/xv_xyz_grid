@@ -13,8 +13,11 @@
 #include <glm/gtx/intersect.hpp>
 #include <cmdline/cmdline.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
+
 #ifdef _WIN32
-#include <io.h> 
+#include <io.h>
 #define access    _access_s
 #else
 #include <unistd.h>
@@ -35,115 +38,8 @@ typedef glm::dvec3 vec3;
 
 #endif
 
-#define VOID void
-
-#include <triangle/triangle.h>
-
 #include "AABB.h"
 
-
-typedef std::vector<vec3> tPoints;
-
-
-void generate_grid(const tPoints &points, struct triangulateio *out) {
-	struct triangulateio in;
-	memset(&in, 0, sizeof(in));
-	in.numberofpoints = (int) points.size();
-	in.numberofpointattributes = 1;
-
-	in.pointlist = (REAL *)malloc(in.numberofpoints * 2 * sizeof(REAL));
-	in.pointattributelist = (REAL *)malloc(in.numberofpoints * in.numberofpointattributes * sizeof(REAL));
-
-	for (auto i = 0; i < in.numberofpoints; ++i) {
-		auto indexDst = i * 2;
-		const auto &p = points[i];
-		in.pointlist[indexDst + 0] = p.x;
-		in.pointlist[indexDst + 1] = p.y;
-		// not sure if it should be put somewhere else.
-		in.pointattributelist[i] = p.z;
-	}
-
-	in.numberofsegments = 0;
-	in.numberofholes = 0;
-	in.numberofregions = 0;
-	
-	memset(out, 0, sizeof(*out));
-	triangulate((char*)"zQ", &in, out, NULL);
-	
-	free(in.pointattributelist);
-	free(in.pointlist);
-}
-
-struct Timing {
-	Timing(const char* description) {
-		mStart = std::chrono::steady_clock::now();
-		std::cout << description;
-		std::cout.flush();
-
-	}
-
-	~Timing() {
-		auto diff = std::chrono::steady_clock::now() - mStart;
-		auto time = std::chrono::duration_cast<std::chrono::milliseconds>(diff);                                                      
-		std::cout << " [took " << time.count() << " milliseconds]" << std::endl;
-	}
-
-	std::chrono::steady_clock::time_point mStart;
-};
-
-typedef std::vector<uint32_t> tIndices;
-
-struct tNode {
-	tIndices indices;
-	bool find_point(const tPoints &points, const vec3 &p) {
-		for (auto index : indices) {
-			const vec3 &o = points[index];
-			if (p == o) {
-				return true;
-			}
-		}
-		return false;
-	}
-	bool find_point_epsilon(const tPoints &points, const vec3 &p, real epsilon) {
-		for (auto index : indices) {
-			const vec3 &o = points[index];
-			if (glm::epsilonEqual(p.x, o.x, epsilon) &&
-				glm::epsilonEqual(p.y, o.y, epsilon) &&
-				glm::epsilonEqual(p.z, o.z, epsilon)) {
-				return true;
-			}
-		}
-		return false;
-	}
-};
-
-
-struct tNodeGrid {
-	tNodeGrid(std::int_fast32_t width, std::int_fast32_t height, const AABB &aabb)
-		: mCoordStart(aabb.mMin), mCoordSize(aabb.len()) {
-		mNodes.resize((width + 1) * (height + 1));
-
-		mGridWidth = width;
-		mGridHeight = height;
-	}
-
-	tNode &nodeAt(const vec3 &p) {
-		int x = (int)glm::floor(((p.x - mCoordStart.x) / mCoordSize.x) *
-			(real)(mGridWidth));
-		int y = (int)glm::floor(((p.y - mCoordStart.y) / mCoordSize.y) *
-			(real)(mGridHeight));
-		return mNodes[x + y * mGridWidth];
-	}
-
-
-	std::vector<tNode> mNodes;
-
-	std::int_fast32_t mGridWidth;
-	std::int_fast32_t mGridHeight;
-
-	vec3 mCoordStart;
-	vec3 mCoordSize;
-};
 
 template <typename OUT, typename T>
 bool write_binary(std::ofstream& out, T& value) {
@@ -152,12 +48,25 @@ bool write_binary(std::ofstream& out, T& value) {
 }
 
 
-bool file_exists(const std::string &Filename)
-{
+bool file_exists(const std::string &Filename) {
 	return access(Filename.c_str(), 0) == 0;
 }
 
-int main(int ac, char **av) {
+struct process_t {
+	std::vector<std::string>	inputs;
+	int							simplifySplit;
+	bool						simplifySplitUseRatio;
+	bool						alwaysNegate;
+	AABB						aabb;
+	int							point_count;
+
+	std::vector<real>	bitmap;
+	int								bitmap_width;
+	int								bitmap_height;
+
+};
+
+void parse_cmd_line(int ac, char** av, process_t& process) {
 	cmdline::parser cmdparser;
 	cmdparser.add<int>("simplify-split",
 		'a',
@@ -169,24 +78,7 @@ int main(int ac, char **av) {
 		'b',
 		"Compute the ratio of dataset, apply it to number of split",
 		false,
-		false);
-	cmdparser.add<bool>("simplify-generate-missing",
-		'c',
-		"Generate missing depth value in dataset, using previous value",
-		false,
 		true);
-
-	cmdparser.add<bool>("simplify-use-min",
-		'd',
-		"Missing value will use minimum depth value",
-		false,
-		true);
-
-	cmdparser.add<bool>("simplify-use-max",
-		'e',
-		"Missing value will use maximum depth value",
-		false,
-		false);
 
 	cmdparser.add<bool>("always-negate",
 		'f',
@@ -194,306 +86,237 @@ int main(int ac, char **av) {
 		false,
 		true);
 
-	cmdparser.add<bool>("generate-obj",
-		'g',
-		"Generate an OBJ file of the generated mesh",
-		false,
-		false);
 
 	cmdparser.parse_check(ac, av);
-	setlocale(LC_ALL, "C");
 
-	auto&	inputs = cmdparser.rest();
-	int		split = cmdparser.get<int>("simplify-split");
+	process.inputs = cmdparser.rest();
+	process.simplifySplit = cmdparser.get<int>("simplify-split");
+	process.simplifySplitUseRatio = cmdparser.get<bool>("simplify-split-use-ratio");
+	process.alwaysNegate = cmdparser.get<bool>("always-negate");
+}
 
-	
-	for (size_t arg = 0; arg < inputs.size(); arg++) {
-		tPoints points_input;
-		tPoints points_result;
-		AABB aabb;
 
-		size_t point_count = 0;
-		if (!file_exists(inputs[arg] + ".bin"))
-		{
-			Timing _("1. loads points, this can take a bit of time ( and memory ) depending on the size of the datasets, compute AABB");
-			std::ifstream input(inputs[arg]);
-			std::ofstream output(inputs[arg] + ".bin", std::ios::binary | std::ios::out);
+void process_xyz_to_bin(process_t& process, const std::string& input, const std::string& output) {
+	if (!file_exists(output)) {
+		std::ifstream input(input);
+		std::ofstream output(output, std::ios::binary | std::ios::out);
 
-			vec3 p;
-			for (std::string line; std::getline(input, line); ) {
-				size_t comment = line.find("#");
-				if (comment > 0) {
-					if (comment != std::string::npos) {
-						line = line.substr(0, comment);
-					}
-					if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
-						point_count++;
-						output.write((char*) &p, sizeof(p));
-						aabb.add(p);
-					}
+		process.point_count = 0;
+		for (std::string line; std::getline(input, line); ) {
+			size_t comment = line.find("#");
+			if (comment > 0) {
+				if (comment != std::string::npos) {
+					line = line.substr(0, comment);
+				}
+				vec3	p;
+				if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
+					output.write((char*)&p, sizeof(p));
+					process.point_count++;
+					process.aabb.add(p);
 				}
 			}
-		} else {
-			Timing _("1. loads points ( from cached binary ), this can take a bit of time ( and memory ) depending on the size of the datasets, compute AABB");
-			std::ifstream input(inputs[arg] + ".bin", std::ios::binary | std::ios::in);
-			vec3 p;
-			while (input.read((char*)&p, sizeof(p))) {
-				aabb.add(p);
-				point_count++;
-			}
+		}
+	}
+}
+
+void process_bin_get_aabb(process_t& process, const std::string& inputAsBIN) {
+	std::ifstream input(inputAsBIN, std::ios::binary | std::ios::in);
+	vec3 p;
+	while (input.read((char*)&p, sizeof(p))) {
+		process.point_count++;
+		process.aabb.add(p);
+	}
+}
+
+void process_bin_to_bitmap(process_t& process, const std::string& inputAsBIN) {
+	process.bitmap_width = process.simplifySplit;
+	process.bitmap_height= process.simplifySplit;
+
+	vec3 len = process.aabb.len();
+
+	if (process.simplifySplitUseRatio) {
+		real ratio = len.x / len.y;
+		process.bitmap_width = (int)glm::max<real>((process.bitmap_width * ratio), 4);
+		process.bitmap_height= (int)glm::max<real>((process.bitmap_height * (1 / ratio)), 4);
+	}
+
+	process.bitmap.resize(process.bitmap_width * process.bitmap_height, 0);
+
+	std::vector<real>		count;
+	int								width = process.bitmap_width;
+	int								height = process.bitmap_height;
+	vec3								ratio = vec3(process.bitmap_width - 1, process.bitmap_height - 1, 1) / len;
+	std::ifstream				input(inputAsBIN, std::ios::binary | std::ios::in);
+	vec3								p;
+
+	count.resize(process.bitmap.size(), 0);
+
+	while (input.read((char*)&p, sizeof(p))) {
+		real x = (p.x - process.aabb.mMin.x) * ratio.x;
+		real y = (p.y - process.aabb.mMin.y) * ratio.y;
+
+		int		px = (int)x;
+		int   py = (int)y;
+
+		int   nx = px + 1;
+		int   ny = py + 1;
+
+		real nfx = (x - (real)px);
+		real nfy = (y - (real)py);
+
+		real pfx = 1 - nfx;
+		real pfy = 1 - nfy;
+
+		real s = pfx * pfy;
+		if (nx < width) {
+			count[px + py * width] += s;
+			process.bitmap[px + py * width] += (p.z * s);
 		}
 
-		if (point_count == 0) {			
+		s = nfx * pfy;
+		if (nx < process.bitmap_width) {
+			count[nx + py * width] += s;
+			process.bitmap[nx + py * width] += (p.z * s);
+		}
+
+		s = nfx * nfy;
+		if (ny < height) {
+			count[nx + ny * width] += s;
+			process.bitmap[nx + ny * width] += (p.z * s);
+		}
+		s = pfx * nfy;
+		if (ny < height) {
+			count[px + ny * width] += s;
+			process.bitmap[px + ny * width] += (p.z * s);
+		}
+	}
+
+	size_t  size = process.bitmap.size();
+	int			empty = 0;
+	for (size_t i = 0; i < size; ++i) {
+		real c = count[i];
+		if (c > 0) {
+			process.bitmap[i] /= count[i];
+		}
+		else {
+			process.bitmap[i] = REAL_MAX;
+		}
+	}
+}
+
+void process_fill_bitmap(process_t& process) {
+	int  index = 0;
+	for (int y = 0; y < process.bitmap_height; ++y) {
+		for (int x = 0; x < process.bitmap_width; ++x) {
+			if (process.bitmap[index] == REAL_MAX) {
+				real values = 0.0f;
+				int	 count = 0;
+
+				for (int yy = -1; yy != 1; ++yy) {
+					for (int xx = -1; xx != 1; ++xx) {
+						int cy = yy + y;
+						int cx = xx + x;
+						if (cy >= 0 && cx >= 0 && cy < process.bitmap_height && cx < process.bitmap_width) {
+							int index_sub = cy * process.bitmap_width + cx;
+							real actual = process.bitmap[index_sub];
+							if (actual != REAL_MAX) {
+								values += actual;
+								count++;
+							}
+						}
+					}
+				}
+				if (count > 0) {
+					process.bitmap[index] = values / count;
+				}
+			}
+			index++;
+		}
+	}
+}
+
+void process_bitmap_to_png(process_t& process, const std::string& outputFile) {
+	std::vector<unsigned char> data;
+	data.reserve(process.bitmap.size());
+	for (auto v : process.bitmap) {
+		if (v == REAL_MAX) {
+			data.push_back(0);
+		}
+		else {
+			real current = (v - process.aabb.mMin.z) / (process.aabb.mMax.z - process.aabb.mMin.z);
+			data.push_back((unsigned char)(current * (real)(255.0f)));
+		}
+	}
+	stbi_write_png(outputFile.c_str(), process.bitmap_width, process.bitmap_height, 1, &(data[0]), process.bitmap_width);
+	// std::vector<float> data;
+	// data.resize(process.bitmap.size());
+	// std::copy(process.bitmap.begin(), process.bitmap.end(), data.begin());
+	// stbi_write_hdr(outputFile.c_str(), process.bitmap_width, process.bitmap_height, 1, &(data[0]));
+}
+
+void process_bitmap_negate(process_t& process) {
+	if (process.alwaysNegate) {
+		for (auto& v : process.bitmap) {
+			if (v != REAL_MAX) {
+				v = (v > 0) ? -v : v;
+			}
+		}
+		real minZ = (process.aabb.mMin.z > 0) ? -process.aabb.mMin.z : process.aabb.mMin.z;
+		real maxZ = (process.aabb.mMax.z > 0) ? -process.aabb.mMax.z : process.aabb.mMax.z;
+		process.aabb.mMin.z = glm::min(minZ, maxZ);
+		process.aabb.mMax.z = glm::max(minZ, maxZ);
+	}
+}
+
+void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
+
+
+	std::ofstream output(outputFile.c_str(), std::ios_base::binary | std::ios_base::trunc);
+
+	write_binary<int>(output, process.bitmap_width);
+	write_binary<int>(output, process.bitmap_height);
+
+	write_binary<float>(output, process.aabb.mMin.x);
+	write_binary<float>(output, process.aabb.mMin.y);
+	write_binary<float>(output, process.aabb.mMin.z);
+
+	write_binary<float>(output, process.aabb.mMax.x);
+	write_binary<float>(output, process.aabb.mMax.y);
+	write_binary<float>(output, process.aabb.mMax.z);
+
+	for (auto& v : process.bitmap) {
+		write_binary<float>(output, v);
+	}
+}
+
+int main(int ac, char **av) {
+	setlocale(LC_ALL, "C");
+
+	process_t process;
+	parse_cmd_line(ac, av, process);
+	for (size_t arg = 0; arg < process.inputs.size(); arg++) {
+		const std::string& input = process.inputs[arg];
+		const std::string& inputAsBIN = input + ".bin";
+
+		process_xyz_to_bin(process, input, inputAsBIN);
+		process_bin_get_aabb(process, inputAsBIN);
+
+		if (process.point_count == 0) {
 			std::cout << "Was not able to read any data." << std::endl;
 			return -1;
 		}
 
-		vec3 len = aabb.len();
-		
+		vec3 len = process.aabb.len();
 		if (glm::length(len) < glm::epsilon<real>()) {
 			std::cout << "Dataset is empty." << std::endl;
 			return -2;
 		}
 
-		int pt_count_x = cmdparser.get<int>("simplify-split");
-		int pt_count_y = pt_count_x;
-
-		if (cmdparser.get<bool>("simplify-split-use-ratio")) {
-			real ratio = len.x / len.y;
-			pt_count_x = (int)glm::max<real>((pt_count_y * ratio), 4);
-			pt_count_x = glm::min<int>(pt_count_x, pt_count_y);
-		}
-
-		std::vector<real>	value;
-		
-
-		value.resize(pt_count_x * pt_count_y, 0);
-		
-		{
-			Timing _("2. converts point to a bitmap");
-			
-			std::vector<real>	count;
-			count.resize(value.size(), 0);
-			vec3 ratio = vec3(pt_count_x - 1, pt_count_y - 1, 1) / len;		
-			std::ifstream input(inputs[arg] + ".bin", std::ios::binary |  std::ios::in);
-			vec3 p;
-			
-			while (input.read((char*)&p, sizeof(p))) {
-				real x = (p.x - aabb.mMin.x) * ratio.x;
-				real y = (p.y - aabb.mMin.y) * ratio.y;
-
-				int		px = (int)x;
-				int   py = (int)y;
-				
-				int   nx = px + 1;
-				int   ny = py + 1;
-
-				real nfx = (x - (real) px);
-				real nfy = (y - (real) py);
-
-				real pfx = 1 - nfx;
-				real pfy = 1 - nfy;
-
-				real s = pfx * pfy;
-				if (nx < pt_count_x) {
-					count[px + py * pt_count_x] += s;
-					value[px + py * pt_count_x] += (p.z * s);
-				}
-				
-				s = nfx * pfy;
-				if (nx < pt_count_x) {
-					count[nx + py * pt_count_x] += s;
-					value[nx + py * pt_count_x] += (p.z * s);
-				}
-				
-				s = nfx * nfy;
-				if (ny < pt_count_y) {
-					count[nx + ny * pt_count_x] += s;
-					value[nx + ny * pt_count_x] += (p.z * s);
-				}
-				s = pfx * nfy;
-				if (ny < pt_count_y) {
-					count[px + ny * pt_count_x] += s;
-					value[px + ny * pt_count_x] += (p.z * s);
-				}
-			}
-			size_t  size = value.size();
-			int			empty = 0;
-			for (size_t i = 0; i < size; ++i) {
-				real c = count[i];
-				if (c > 0) {
-					value[i] /= count[i];
-				} else {
-					value[i] = REAL_MAX;
-				}
-			}			
-		}
-		
-
-		struct triangulateio mid;
-		{
-			Timing _("3. generating grid from bitmap points");
-			size_t size = value.size();
-			points_input.clear();
-			points_input.reserve(size);
-
-			vec3 ratio = len / vec3(pt_count_x - 1, pt_count_y - 1, 1);
-			for (int i = 0; i < size; ++i) {
-				real v = value[i];
-				int y = i / pt_count_x;
-				int x = i - (y * pt_count_x);
-
-				if (v != REAL_MAX) {
-					points_input.push_back(vec3(x * ratio.x + aabb.mMin.x, y * ratio.y + aabb.mMin.y, value[i]));
-				}
-				else {
-					points_input.push_back(vec3(x * ratio.x + aabb.mMin.x, y * ratio.y + aabb.mMin.y, aabb.mMin.z));
-				}
-			}
-			
-			generate_grid(points_input, &mid);
-			points_input.clear();					
-		}
-		
-		{
-			const int cNodeGridWidth = 16;
-			const int cNodeGridHeight = 16;
-
-			Timing _("4. generation of the simplified dataset");
-			tNodeGrid grid(cNodeGridWidth, cNodeGridHeight, aabb);
-
-			for (auto i = 0; i < mid.numberofpoints; ++i) {
-				auto index = i * 2;
-				points_input.push_back(vec3(mid.pointlist[index + 0], mid.pointlist[index + 1], mid.pointattributelist[i]));
-			}
-
-			for (auto i = 0; i < mid.numberoftriangles; i++) {
-				auto index = i * mid.numberofcorners;
-
-				auto i1 = mid.trianglelist[index + 0];
-				auto i2 = mid.trianglelist[index + 1];
-				auto i3 = mid.trianglelist[index + 2];
-
-				AABB tri_bbox;
-				tri_bbox.add(points_input[i1]);
-				tri_bbox.add(points_input[i2]); 
-				tri_bbox.add(points_input[i3]);
-
-				vec3 grid_delta = grid.mCoordSize / (vec3(grid.mGridWidth, grid.mGridHeight, 1));
-				for (int y = 0; y < grid.mGridHeight; ++y) {
-					for (int x = 0; x < grid.mGridWidth; ++x) {
-						AABB aabb(grid.mCoordStart, grid.mCoordStart + grid_delta);
-						aabb.offset(grid_delta * vec3(x, y, 0));
-						if (aabb.contains(tri_bbox)) {
-							auto node_index = x + y * grid.mGridWidth;
-							grid.mNodes[node_index].indices.push_back(index);
-						}
-					}
-				}
-			}
-			vec3 direction(0, 0, -1);
-			vec3 start(0, 0, glm::abs(aabb.mMax.z) * 2);
-			
-			real delta_x = len.x / (real)(pt_count_x - 1);
-			real delta_y = len.y / (real)(pt_count_y - 1);
-			bool generate_missing = cmdparser.get<bool>("simplify-generate-missing");
-			real minZ = glm::abs(aabb.mMin.z);
-			real maxZ = glm::abs(aabb.mMax.z);
-
-			real missing = cmdparser.get<bool>("simplify-use-max") ? glm::max(minZ, maxZ) : glm::min(minZ, maxZ);
-			
-			points_result.reserve(pt_count_x * pt_count_y);
-			for (int y = 0; y < pt_count_y; ++y) {
-				for (int x = 0; x < pt_count_x; ++x) {
-					int index = y * pt_count_x + x;
-					start.x = aabb.mMin.x + x * delta_x;
-					start.y = aabb.mMin.y + y * delta_y;
-					
-					if (value[index] == REAL_MAX) {
-						tNode &node = grid.nodeAt(start);
-						bool generated = false;
-						for (auto index : node.indices) {
-							auto i1 = mid.trianglelist[index + 0];
-							auto i2 = mid.trianglelist[index + 1];
-							auto i3 = mid.trianglelist[index + 2];
-
-							vec3 res;
-							if (glm::intersectRayTriangle(start, direction, points_input[i1], points_input[i2], points_input[i3], res)) {
-								points_result.push_back(start + direction * res.z);
-								generated = true;
-								break;
-							}
-						}
-
-						if (generate_missing && !generated) {
-							points_result.push_back(vec3(start.x, start.y, missing));
-						}
-					}
-					else {
-						points_result.push_back(vec3(start.x, start.y, value[index]));
-					}
-				}
-			}
-		}
-
-		{
-			Timing _("6. generating output XVB");
-
-			std::string		output_file_name = inputs[arg] + ".xvb";
-			std::ofstream output(output_file_name.c_str(), std::ios_base::binary | std::ios_base::trunc);
-
-
-			if (cmdparser.get<bool>("always-negate")) {
-				aabb.reset();
-				for (auto& v : points_result) {
-					if (v.z > 0) {
-						v.z = -v.z;
-					}
-					aabb.add(v);
-				}
-			}
-			
-			write_binary<int>(output, pt_count_x);
-			write_binary<int>(output, pt_count_y);
-
-			write_binary<float>(output, aabb.mMin.x);
-			write_binary<float>(output, aabb.mMin.y);
-			write_binary<float>(output, aabb.mMin.z);
-
-			write_binary<float>(output, aabb.mMax.x);
-			write_binary<float>(output, aabb.mMax.y);
-			write_binary<float>(output, aabb.mMax.z);
-
-			for (auto& v : points_result) {
-				write_binary<float>(output, v.z);
-			}
-		}
-
-		if (cmdparser.get<bool>("generate-obj")) {
-			Timing _("7. generating output OBJ");
-			std::string output_file_name = inputs[arg] + ".obj";
-			std::ofstream output(output_file_name.c_str());
-			for (auto i = 0; i < mid.numberofpoints; ++i) {
-				auto index = i * 2;
-				output << std::fixed
-					<< "v " << (mid.pointlist[index + 0])
-					<< "  " << (mid.pointlist[index + 1])
-					<< "  " << (mid.pointattributelist[i]) << std::endl;
-			}
-
-			for (auto i = 0; i < mid.numberoftriangles; i++) {
-				output << "f ";
-				for (auto j = 0; j < mid.numberofcorners; j++) {
-					output << mid.trianglelist[i * mid.numberofcorners + j] + 1 << " ";
-				}
-				output << std::endl;
-			}
-		}
-
-		free(mid.pointlist);
-		free(mid.pointattributelist);
-		free(mid.pointmarkerlist);
-		free(mid.trianglelist);		
-	}	
+		process_bin_to_bitmap(process, inputAsBIN);
+		process_bitmap_negate(process);
+		process_bitmap_to_png(process, input + ".before.png");
+		// process_fill_bitmap(process);
+		process_bitmap_to_xvb(process, input + ".xvb");
+	}
   return 0;
 }
