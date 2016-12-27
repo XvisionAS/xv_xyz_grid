@@ -146,8 +146,8 @@ void process_bin_to_bitmap(process_t& process, const std::string& inputAsBIN) {
 	process.bitmap.resize(process.bitmap_width * process.bitmap_height, 0);
 
 	std::vector<real>		count;
-	int								width = process.bitmap_width;
-	int								height = process.bitmap_height;
+	int									width = process.bitmap_width;
+	int									height = process.bitmap_height;
 	vec3								ratio = vec3(process.bitmap_width - 1, process.bitmap_height - 1, 1) / len;
 	std::ifstream				input(inputAsBIN, std::ios::binary | std::ios::in);
 	vec3								p;
@@ -171,26 +171,26 @@ void process_bin_to_bitmap(process_t& process, const std::string& inputAsBIN) {
 		real pfy = 1 - nfy;
 
 		real s = pfx * pfy;
-		if (nx < width) {
-			count[px + py * width] += s;
-			process.bitmap[px + py * width] += (p.z * s);
-		}
+
+		count[px + py * width] += s;
+		process.bitmap[px + py * width] += (p.z * s);
 
 		s = nfx * pfy;
-		if (nx < process.bitmap_width) {
+		if (nx < width) {
 			count[nx + py * width] += s;
 			process.bitmap[nx + py * width] += (p.z * s);
 		}
-
-		s = nfx * nfy;
-		if (ny < height && nx < width) {
-			count[nx + ny * width] += s;
-			process.bitmap[nx + ny * width] += (p.z * s);
-		}
+		
 		s = pfx * nfy;
 		if (ny < height) {
 			count[px + ny * width] += s;
 			process.bitmap[px + ny * width] += (p.z * s);
+		}
+
+		s = nfx * nfy;
+		if ( (ny < height) && (nx < width) ) {
+			count[nx + ny * width] += s;
+			process.bitmap[nx + ny * width] += (p.z * s);
 		}
 	}
 
