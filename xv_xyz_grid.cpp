@@ -53,6 +53,9 @@ bool file_exists(const std::string &Filename) {
 }
 
 struct process_t {
+	process_t() : point_count(0), bitmap_height(0), bitmap_width(0) {
+
+	}
 	std::vector<std::string>	inputs;
 	int							simplifySplit;
 	bool						simplifySplitUseRatio;
@@ -180,7 +183,7 @@ void process_bin_to_bitmap(process_t& process, const std::string& inputAsBIN) {
 		}
 
 		s = nfx * nfy;
-		if (ny < height) {
+		if (ny < height && nx < width) {
 			count[nx + ny * width] += s;
 			process.bitmap[nx + ny * width] += (p.z * s);
 		}
