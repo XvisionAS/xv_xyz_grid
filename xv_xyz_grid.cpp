@@ -300,8 +300,9 @@ int main(int ac, char **av) {
 	for (size_t arg = 0; arg < process.inputs.size(); arg++) {
 		const std::string& input = process.inputs[arg];
 		const std::string& inputAsBIN = input + ".bin";
-
+		std::cout << "xv_xyz_grid: process_xyz_to_bin" << std::endl;
 		process_xyz_to_bin(process, input, inputAsBIN);
+		std::cout << "xv_xyz_grid: process_bin_get_aabb" << std::endl;
 		process_bin_get_aabb(process, inputAsBIN);
 
 		if (process.point_count == 0) {
@@ -315,10 +316,14 @@ int main(int ac, char **av) {
 			return -2;
 		}
 
+		std::cout << "xv_xyz_grid: process_bin_to_bitmap" << std::endl;
 		process_bin_to_bitmap(process, inputAsBIN);
+		std::cout << "xv_xyz_grid: process_bitmap_negate" << std::endl;
 		process_bitmap_negate(process);
+		std::cout << "xv_xyz_grid: process_bitmap_to_png" << std::endl;
 		process_bitmap_to_png(process, input + ".before.png");
 		// process_fill_bitmap(process);
+		std::cout << "xv_xyz_grid: process_bitmap_to_xvb" << std::endl;
 		process_bitmap_to_xvb(process, input + ".xvb");
 	}
   return 0;
