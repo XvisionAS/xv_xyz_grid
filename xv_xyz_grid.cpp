@@ -1,5 +1,6 @@
 #include <vector>
 
+#include <stack>
 #include <fstream>
 #include <iostream>
 #include <locale.h>
@@ -235,8 +236,80 @@ void process_fill_bitmap(process_t& process) {
 	}
 }
 
+#define RGB(arr, r, g, b) *arr++ = r, *arr++ = g, *arr++ = b;
+
+#define MASK_SET			2
+#define MASK_VALID		1
+#define MASK_EMPTY		0
+
+#define ENCODE(left, right) ((unsigned int) (left) << 16 | (unsigned int) (right))
+#define DECODE(value, left, right) left = (unsigned short) (value >> 16), right = (unsigned short) (value & 0xffff)
+
+void magic_wand(process_t& process, std::vector<unsigned char>& mask, unsigned short x, unsigned short y) {
+	if (mask[y * process.bitmap_width + x] != MASK_VALID) {
+		return;
+	}
+
+	std::stack<unsigned int> queue;
+	queue.push(ENCODE(x, y));
+
+	while (!queue.empty()) {
+		DECODE(queue.top(), x, y), queue.pop();
+
+		int		stride	= y * process.bitmap_width;
+		auto	line		= &(mask[y * process.bitmap_width]);
+		int		left		= x, right = x;
+		while ((left >= 0) && (line[left] == MASK_VALID)) {
+			left--;
+		}
+		while ((right < process.bitmap_width) && (line[right] == MASK_VALID)) {
+			right++;
+		}
+
+		for (int xx = left; xx < right; ++xx) {
+			if (xx >= 0 && xx < process.bitmap_width) {
+				mask[stride + xx] = MASK_EMPTY;
+				if ((y > 0) && (line[xx - process.bitmap_width] == MASK_VALID)) {
+					queue.push(ENCODE(xx, y - 1));
+				}
+				if ((y < (process.bitmap_height - 1)) && (line[xx + process.bitmap_width] == MASK_VALID)) {
+					queue.push(ENCODE(xx, y + 1));
+				}
+			}
+		}
+
+		if (left >= 0) {
+			mask[stride + left] = MASK_SET;
+		}
+		if (right < process.bitmap_width) {
+			mask[stride + right] = MASK_SET;
+		}
+	}
+}
+
 void process_bitmap_to_png(process_t& process, const std::string& outputFile) {
+	std::vector<unsigned char>	mask;
+	mask.reserve(process.bitmap.size());
+	for (auto value : process.bitmap) {
+		mask.push_back((value == REAL_MAX) * MASK_VALID);
+	}
+	magic_wand(process, mask, 0, 0);
+	magic_wand(process, mask, process.bitmap_width - 1, 0);
+	magic_wand(process, mask, process.bitmap_width - 1, process.bitmap_height - 1);
+	magic_wand(process, mask, 0, process.bitmap_height - 1);
+
 	std::vector<unsigned char> data;
+	data.resize(process.bitmap.size() * 3, 0);
+	unsigned char* ptr_dst = &(data[0]);
+	unsigned char* ptr_src = &(mask[0]);
+	for (auto i = process.bitmap.size(); i >0; --i) {
+		*ptr_dst = (*ptr_src++ & MASK_SET) * 255;
+		ptr_dst += 3;
+	}
+
+	stbi_write_png((outputFile + ".inside.png").c_str(), process.bitmap_width, process.bitmap_height, 3, &(data[0]), process.bitmap_width * 3);
+
+	data.clear();
 	data.reserve(process.bitmap.size());
 	for (auto v : process.bitmap) {
 		if (v == REAL_MAX) {
