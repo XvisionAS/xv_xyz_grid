@@ -322,11 +322,11 @@ int main(int ac, char **av) {
 			return -1;
 		}
 
-		vec3 len = process.aabb.len();
+		/*vec3 len = process.aabb.len();
 		if (glm::length(len) < glm::epsilon<real>()) {
 			std::cout << "Dataset is empty." << std::endl;
 			return -2;
-		}
+		}*/
 
 		std::cout << "xv_xyz_grid: process_bin_to_bitmap" << std::endl;
 		process_bin_to_bitmap(process, inputAsBIN);
