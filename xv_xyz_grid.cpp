@@ -138,9 +138,11 @@ void process_bin_to_bitmap(process_t& process, const std::string& inputAsBIN) {
 	vec3 len = process.aabb.len();
 
 	if (process.simplifySplitUseRatio) {
-		real ratio = len.x / len.y;
-		process.bitmap_width = (int)glm::max<real>((process.bitmap_width * ratio), 4);
-		process.bitmap_height= (int)glm::max<real>((process.bitmap_height * (1 / ratio)), 4);
+		real bitmap_ratio = len.x / len.y;
+		if (bitmap_ratio > 0) {
+			process.bitmap_width = (int)glm::max<real>((process.bitmap_width * bitmap_ratio), 4);
+			process.bitmap_height= (int)glm::max<real>((process.bitmap_height * (1 / bitmap_ratio)), 4);
+		}
 	}
 
 	process.bitmap.resize(process.bitmap_width * process.bitmap_height, 0);
@@ -152,6 +154,16 @@ void process_bin_to_bitmap(process_t& process, const std::string& inputAsBIN) {
 	std::ifstream				input(inputAsBIN, std::ios::binary | std::ios::in);
 	vec3								p;
 
+	if (glm::isinf(ratio.x)) {
+		ratio.x = 0;
+	}
+	if (glm::isinf(-ratio.y)) {
+		ratio.y = 0;
+	}
+	if (glm::isinf(-ratio.z)) {
+		ratio.z = 0;
+	}
+	
 	count.resize(process.bitmap.size(), 0);
 
 	while (input.read((char*)&p, sizeof(p))) {
