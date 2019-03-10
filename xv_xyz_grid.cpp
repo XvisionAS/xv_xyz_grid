@@ -280,7 +280,7 @@ void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
   write_binary<float>(output, process.aabb.mMax.z);
 
   for (auto& v : process.bitmap) {
-    real d = (v == REAL_MAX) ? (process.aabb.mMin.z * 2.0f) : v;
+    real d = (v == REAL_MAX) ? (process.aabb.mMin.z - 1) : v;
     write_binary<float>(output, d);
   }
 }
