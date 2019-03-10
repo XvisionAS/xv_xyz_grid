@@ -173,14 +173,14 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   if (glm::isinf(-ratio.z)) {
     ratio.z = 0;
   }
-  std::vector<std::vector<real>> bitmap;
-  bitmap.resize(process.bitmap.size());
+  std::vector<real> bitmap;
+  bitmap.resize(process.bitmap.size(), 0);
   count.resize(process.bitmap.size(), 0);
 
   while (input.read((char*)&p, sizeof(p))) {
     real x = (p.x - process.aabb.mMin.x) * ratio.x;
     real y = (p.y - process.aabb.mMin.y) * ratio.y;
-    real z = p.z;
+    real z = (p.z - process.aabb.mMin.z) * z_factor ;
 
     int   px = (int)x;
     int   py = (int)y;
@@ -197,24 +197,24 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
     real s = pfx * pfy;
 
     count[px + py * width] += s;
-    bitmap[px + py * width].push_back(z * s);
+    bitmap[px + py * width] += (z * s);
 
     s = nfx * pfy;
     if (nx < width) {
       count[nx + py * width] += s;
-      bitmap[nx + py * width].push_back(z * s);
+      bitmap[nx + py * width] += (z * s);
     }
     
     s = pfx * nfy;
     if (ny < height) {
       count[px + ny * width] += s;
-      bitmap[px + ny * width].push_back(z * s);
+      bitmap[px + ny * width] += (z * s);
     }
 
     s = nfx * nfy;
     if ( (ny < height) && (nx < width) ) {
       count[nx + ny * width] += s;
-      bitmap[nx + ny * width].push_back(z * s);
+      bitmap[nx + ny * width] += (z * s);
     }
   }
 
@@ -223,12 +223,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   for (size_t i = 0; i < size; ++i) {
     real c = count[i];
     if (c > 0) {
-      real value = 0;
-      real mult  = 1 / count[i];
-      for (auto v: bitmap[i]) {
-        value += v * mult;
-      }
-      process.bitmap[i] = value;
+      process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.mMin.z;
     } else {
       empty++;
     }
@@ -271,6 +266,15 @@ void process_bitmap_negate(process_t& process) {
 
 void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
 
+  real min_z = REAL_MAX;
+  real max_z = -REAL_MAX;
+  for (auto& v : process.bitmap) {
+    if (v != REAL_MAX) {
+      min_z = glm::min(min_z, v);
+      max_z = glm::max(max_z, v);
+    }
+  }
+
   std::ofstream output(outputFile.c_str(), std::ios_base::binary | std::ios_base::trunc);
 
   write_binary<int>(output, process.bitmap_width);
@@ -278,11 +282,11 @@ void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
 
   write_binary<float>(output, process.aabb.mMin.x);
   write_binary<float>(output, process.aabb.mMin.y);
-  write_binary<float>(output, process.aabb.mMin.z);
+  write_binary<float>(output, min_z);
 
   write_binary<float>(output, process.aabb.mMax.x);
   write_binary<float>(output, process.aabb.mMax.y);
-  write_binary<float>(output, process.aabb.mMax.z);
+  write_binary<float>(output, max_z);
 
   for (auto& v : process.bitmap) {
     real d = (v == REAL_MAX) ? (process.aabb.mMin.z - 1) : v;
