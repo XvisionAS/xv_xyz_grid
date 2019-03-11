@@ -321,8 +321,42 @@ void process_bitmap_double(process_t& process) {
 }
 
 
-uint8 float_to_char(float value) {
-  return (uint8) ((value + 1.0f) * (255.0f / 2.0));
+uint8 real_to_byte(real value) {
+  return (uint8)  glm::max( 
+                    0.0, 
+                    glm::min(
+                      (value + 1.0) * (255.0 / 2.0), 
+                      255.0
+                    )
+                  );
+}
+
+vec3 compute_normal_sobel(const std::vector<double>& image, int w, int h, int u, int v)
+{
+    // Value from trial & error.
+    // Seems to work fine for the scales we are dealing with.
+    real u0 = glm::max(u - 1, 0);
+    real v0 = glm::max(v - 1, 0) * w;
+
+    real u2 = glm::min(u + 1, w - 1);
+    real v2 = glm::min(v + 1, h - 1) * w;
+
+    real u1 = u;
+    real v1 = v * w;
+
+    real tl = glm::abs(image[u0 + v0]);
+    real l  = glm::abs(image[u0 + v1]);
+    real bl = glm::abs(image[u0 + v2]);
+    real b  = glm::abs(image[u1 + v2]);
+    real br = glm::abs(image[u2 + v2]);
+    real r  = glm::abs(image[u2 + v1]);
+    real tr = glm::abs(image[u2 + v0]);
+    real t  = glm::abs(image[u1 + v0]);
+
+    real dX = tr + 2 * r + br - tl - 2 * l - bl;
+    real dY = bl + 2 * b + br - tl - 2 * t - tr;
+
+    return glm::normalize(vec3(dX, dY, 32.0f));
 }
 
 void process_generate_normalmap(const process_t& process, const std::string& file_name) {
@@ -331,28 +365,31 @@ void process_generate_normalmap(const process_t& process, const std::string& fil
   const int maxx   = width - 1;
   const int maxy   = height - 1;  
 
+  // Matrix filter = get_gaussian(5, 5, 10.0);
 
+  // std::vector<double> bitmap = apply_filter(process.bitmap, width, height, filter);
+  const auto& bitmap = process.bitmap;
   std::vector<uint8> data;
   data.resize(width * height * 3, 255);
 
   for (int y = 0; y < height; y++) {
-    int y1 = glm::min(y + 1, maxy);
-    glm::vec3 p, px, py, n;
+    // int y1 = glm::min(y + 1, maxy);
+    // glm::vec3 p, px, py, n;
 
 //    glm::vec3* n = normals.data() + y * width;
     for (int x = 0; x < width; x++) {
-      int x1 = glm::min(x + 1, maxx);
-      glm::vec3 p0(x, y,  process.bitmap[x + y * width]);
-      glm::vec3 p1(x1, y, process.bitmap[x1 + y * width]);
-      glm::vec3 p2(x, y1, process.bitmap[x + y1 * width]);
+      // int x1 = glm::min(x + 1, maxx);
+      // glm::vec3 p0(x,  y,  bitmap[x  + y  * width]);
+      // glm::vec3 p1(x1, y, bitmap[x1 + y  * width]);
+      // glm::vec3 p2(x,  y1, bitmap[x  + y1 * width]);
       
-      glm::vec3 a = p1 - p0;
-      glm::vec3 b = p2 - p0;
-      n = glm::normalize(glm::cross(a, b));
-
-      data[y*width*3 + x*3 + 0] = float_to_char(n.x);
-      data[y*width*3 + x*3 + 1] = float_to_char(n.y);
-      data[y*width*3 + x*3 + 2] = float_to_char(n.z);
+      // glm::vec3 a = p1 - p0;
+      // glm::vec3 b = p2 - p0;
+      // n = glm::normalize(glm::cross(a, b));
+      vec3 n = compute_normal_sobel(bitmap, width, height, x, y);
+      data[y*width*3 + x*3 + 0] = real_to_byte(n.x);
+      data[y*width*3 + x*3 + 1] = real_to_byte(n.y);
+      data[y*width*3 + x*3 + 2] = real_to_byte(n.z);
     }
   }
   
