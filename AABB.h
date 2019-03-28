@@ -4,47 +4,47 @@
 struct AABB {
 
 	AABB()
-		: mMin(std::numeric_limits<real>::max()),
-		mMax(-std::numeric_limits<real>::max())
+		: min(std::numeric_limits<real>::max()),
+		max(-std::numeric_limits<real>::max())
 	{}
 
-	AABB(const vec3& mi, const vec3& ma) : mMin(mi), mMax(ma) {
+	AABB(const vec3& mi, const vec3& ma) : min(mi), max(ma) {
 
 	}
 	void reset() {
-		mMin = vec3(std::numeric_limits<real>::max());
-		mMax = -mMin;
+		min = vec3(std::numeric_limits<real>::max());
+		max = -min;
 	}
 
 	void offset(const vec3& o) {
-		mMin += o;
-		mMax += o;
+		min += o;
+		max += o;
 	}
 
 	void add(const vec3 &p) {
-		mMin = glm::min(p, mMin);
-		mMax = glm::max(p, mMax);
+		min = glm::min(p, min);
+		max = glm::max(p, max);
 	}
 
-	vec3 len() const { return mMax - mMin; }
+	vec3 len() const { return max - min; }
 
 	bool contains(const vec3 &p) {
-		return p.x > mMin.x && p.x <= mMax.x && p.y > mMin.y && p.y <= mMax.y &&
-			p.z > mMin.z && p.z <= mMax.z;
+		return p.x > min.x && p.x <= max.x && p.y > min.y && p.y <= max.y &&
+			p.z > min.z && p.z <= max.z;
 	}
 
 	bool contains(const AABB& bb) {
-		if (bb.mMin.x > mMax.x || bb.mMax.x < mMin.x)
+		if (bb.min.x > max.x || bb.max.x < min.x)
 			return false;
-		else if (bb.mMin.y > mMax.y || bb.mMax.y < mMin.y)
+		else if (bb.min.y > max.y || bb.max.y < min.y)
 			return false;
-		else if (bb.mMin.z > mMax.z || bb.mMax.z < mMin.z)
+		else if (bb.min.z > max.z || bb.max.z < min.z)
 			return false;
 
 		return true;
 	}
-	vec3 mMin;
-	vec3 mMax;
+	vec3 min;
+	vec3 max;
 };
 
 #endif

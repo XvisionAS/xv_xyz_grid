@@ -61,16 +61,17 @@ struct process_t {
 
   }
   std::vector<std::string>  inputs;
-  int                       simplifySplit;
-  bool                      simplifySplitUseRatio;
-  bool                      alwaysNegate;
-  bool                      generateNormal;
+  int                       simplify_split;
+  bool                      simplify_split_use_ratio;
+  bool                      always_negate;
+  bool                      generate_normal;
   AABB                      aabb;
   int                       point_count;
-
+  real                      normal_z;
   std::vector<real>         bitmap;
   int                       bitmap_width;
   int                       bitmap_height;
+
 
   std::vector<real>         previous_bitmap;
   int                       previous_bitmap_width;
@@ -109,14 +110,13 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
     false,
     false);
 
-
   cmdparser.parse_check(ac, av);
 
-  process.inputs = cmdparser.rest();
-  process.simplifySplit = cmdparser.get<int>("simplify-split");
-  process.simplifySplitUseRatio = cmdparser.get<bool>("simplify-split-use-ratio");
-  process.alwaysNegate = cmdparser.get<bool>("always-negate");
-  process.generateNormal = cmdparser.get<bool>("generate-normal");
+  process.inputs                   = cmdparser.rest();
+  process.simplify_split           = cmdparser.get<int>("simplify-split");
+  process.simplify_split_use_ratio = cmdparser.get<bool>("simplify-split-use-ratio");
+  process.always_negate            = cmdparser.get<bool>("always-negate");
+  process.generate_normal          = cmdparser.get<bool>("generate-normal");
 }
 
 
@@ -178,9 +178,9 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   count.resize(process.bitmap.size(), 0);
 
   while (input.read((char*)&p, sizeof(p))) {
-    real x = (p.x - process.aabb.mMin.x) * ratio.x;
-    real y = (p.y - process.aabb.mMin.y) * ratio.y;
-    real z = (p.z - process.aabb.mMin.z) * z_factor ;
+    real x = (p.x - process.aabb.min.x) * ratio.x;
+    real y = (p.y - process.aabb.min.y) * ratio.y;
+    real z = (p.z - process.aabb.min.z) * z_factor ;
 
     int   px = (int)x;
     int   py = (int)y;
@@ -204,7 +204,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
       count[nx + py * width] += s;
       bitmap[nx + py * width] += (z * s);
     }
-    
+
     s = pfx * nfy;
     if (ny < height) {
       count[px + ny * width] += s;
@@ -223,7 +223,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   for (size_t i = 0; i < size; ++i) {
     real c = count[i];
     if (c > 0) {
-      process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.mMin.z;
+      process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
     } else {
       empty++;
     }
@@ -239,7 +239,7 @@ void process_bitmap_to_png(process_t& process, const std::string& outputFile) {
       data.push_back(0);
     }
     else {
-      real current = (v - process.aabb.mMin.z) / (process.aabb.mMax.z - process.aabb.mMin.z);
+      real current = (v - process.aabb.min.z) / (process.aabb.max.z - process.aabb.min.z);
       data.push_back((unsigned char)(current * (real)(255.0f)));
     }
   }
@@ -251,16 +251,16 @@ void process_bitmap_to_png(process_t& process, const std::string& outputFile) {
 }
 
 void process_bitmap_negate(process_t& process) {
-  if (process.alwaysNegate) {
+  if (process.always_negate) {
     for (auto& v : process.bitmap) {
       if (v != REAL_MAX) {
         v = (v > 0) ? -v : v;
       }
     }
-    real minZ = (process.aabb.mMin.z > 0) ? -process.aabb.mMin.z : process.aabb.mMin.z;
-    real maxZ = (process.aabb.mMax.z > 0) ? -process.aabb.mMax.z : process.aabb.mMax.z;
-    process.aabb.mMin.z = glm::min(minZ, maxZ);
-    process.aabb.mMax.z = glm::max(minZ, maxZ);
+    real minZ = (process.aabb.min.z > 0) ? -process.aabb.min.z : process.aabb.min.z;
+    real maxZ = (process.aabb.max.z > 0) ? -process.aabb.max.z : process.aabb.max.z;
+    process.aabb.min.z = glm::min(minZ, maxZ);
+    process.aabb.max.z = glm::max(minZ, maxZ);
   }
 }
 
@@ -280,16 +280,16 @@ void process_bitmap_to_xvb(process_t& process, const std::string& outputFile) {
   write_binary<int>(output, process.bitmap_width);
   write_binary<int>(output, process.bitmap_height);
 
-  write_binary<float>(output, process.aabb.mMin.x);
-  write_binary<float>(output, process.aabb.mMin.y);
+  write_binary<float>(output, process.aabb.min.x);
+  write_binary<float>(output, process.aabb.min.y);
   write_binary<float>(output, min_z);
 
-  write_binary<float>(output, process.aabb.mMax.x);
-  write_binary<float>(output, process.aabb.mMax.y);
+  write_binary<float>(output, process.aabb.max.x);
+  write_binary<float>(output, process.aabb.max.y);
   write_binary<float>(output, max_z);
 
   for (auto& v : process.bitmap) {
-    real d = (v == REAL_MAX) ? (process.aabb.mMin.z - 1) : v;
+    real d = (v == REAL_MAX) ? (process.aabb.min.z - 1) : v;
     write_binary<float>(output, d);
   }
 }
@@ -321,87 +321,101 @@ void process_bitmap_double(process_t& process) {
 }
 
 
-uint8 real_to_byte(real value) {
-  return (uint8)  glm::max( 
-                    0.0, 
+inline uint8 real_to_byte(real value) {
+  return (uint8)  glm::max(
+                    0.0,
                     glm::min(
-                      (value + 1.0) * (255.0 / 2.0), 
+                      (value + 1.0) * (255.0 / 2.0),
                       255.0
                     )
                   );
 }
 
-vec3 compute_normal_sobel(const std::vector<double>& image, int w, int h, int u, int v)
+vec3 compute_normal_sobel(const process_t& process, const std::vector<real>& image, int w, int h, int u, int v)
 {
-    // Value from trial & error.
-    // Seems to work fine for the scales we are dealing with.
-    real u0 = glm::max(u - 1, 0);
-    real v0 = glm::max(v - 1, 0) * w;
+  real u0 = glm::max(u - 1, 0);
+  real v0 = glm::max(v - 1, 0) * w;
 
-    real u2 = glm::min(u + 1, w - 1);
-    real v2 = glm::min(v + 1, h - 1) * w;
+  real u2 = glm::min(u + 1, w - 1);
+  real v2 = glm::min(v + 1, h - 1) * w;
 
-    real u1 = u;
-    real v1 = v * w;
+  real u1 = u;
+  real v1 = v * w;
 
-    real tl = glm::abs(image[u0 + v0]);
-    real l  = glm::abs(image[u0 + v1]);
-    real bl = glm::abs(image[u0 + v2]);
-    real b  = glm::abs(image[u1 + v2]);
-    real br = glm::abs(image[u2 + v2]);
-    real r  = glm::abs(image[u2 + v1]);
-    real tr = glm::abs(image[u2 + v0]);
-    real t  = glm::abs(image[u1 + v0]);
+  real tl = glm::abs(image[u0 + v0]);
+  real l  = glm::abs(image[u0 + v1]);
+  real bl = glm::abs(image[u0 + v2]);
+  real b  = glm::abs(image[u1 + v2]);
+  real br = glm::abs(image[u2 + v2]);
+  real r  = glm::abs(image[u2 + v1]);
+  real tr = glm::abs(image[u2 + v0]);
+  real t  = glm::abs(image[u1 + v0]);
 
-    real dX = tr + 2 * r + br - tl - 2 * l - bl;
-    real dY = bl + 2 * b + br - tl - 2 * t - tr;
+  real dX = tr + 2 * r + br - tl - 2 * l - bl;
+  real dY = bl + 2 * b + br - tl - 2 * t - tr;
 
-    return glm::normalize(vec3(dX, dY, 32.0f));
+  return glm::normalize(vec3(dX, dY, process.normal_z));
+}
+
+vec3 compute_normal(const process_t& process, const std::vector<real>& image, real stepx, real stepy, int x, int y, int dx, int dy, int width) {
+  int ax = x, ay = y;
+  int bx = x + dx, by = y;
+  int cx = x, cy = y + dy;
+  vec3 a(ax * stepx, ay * stepy, image[ax + ay * width]);
+  vec3 b(bx * stepx, by * stepy, image[bx + by * width]);
+  vec3 c(cx * stepx, cy * stepy, image[cx + cy * width]);
+
+  vec3 ab = b - a;
+  vec3 ac = c - a;
+
+  return glm::normalize(
+    glm::cross(ab, ac)
+  );
 }
 
 void process_generate_normalmap(const process_t& process, const std::string& file_name) {
   const int width  = process.bitmap_width;
   const int height = process.bitmap_height;
   const int maxx   = width - 1;
-  const int maxy   = height - 1;  
-
+  const int maxy   = height - 1;
+  const real stepx = (process.aabb.max.x - process.aabb.min.x) / (real) width;
+  const real stepy = (process.aabb.max.y - process.aabb.min.y) / (real) height;
   // Matrix filter = get_gaussian(5, 5, 10.0);
 
   // std::vector<double> bitmap = apply_filter(process.bitmap, width, height, filter);
   const auto& bitmap = process.bitmap;
   std::vector<uint8> data;
   data.resize(width * height * 3, 255);
-
-  for (int y = 0; y < height; y++) {
-    // int y1 = glm::min(y + 1, maxy);
-    // glm::vec3 p, px, py, n;
-
-//    glm::vec3* n = normals.data() + y * width;
-    for (int x = 0; x < width; x++) {
-      // int x1 = glm::min(x + 1, maxx);
-      // glm::vec3 p0(x,  y,  bitmap[x  + y  * width]);
-      // glm::vec3 p1(x1, y, bitmap[x1 + y  * width]);
-      // glm::vec3 p2(x,  y1, bitmap[x  + y1 * width]);
-      
-      // glm::vec3 a = p1 - p0;
-      // glm::vec3 b = p2 - p0;
-      // n = glm::normalize(glm::cross(a, b));
-      vec3 n = compute_normal_sobel(bitmap, width, height, x, y);
-      data[y*width*3 + x*3 + 0] = real_to_byte(n.x);
-      data[y*width*3 + x*3 + 1] = real_to_byte(n.y);
-      data[y*width*3 + x*3 + 2] = real_to_byte(n.z);
+/////////////////////////////////////////////////////////////////////////////
+#define OUTPUT_NORMAL(x, y, dx, dy) {\
+  vec3 n = compute_normal(process, bitmap, stepx, stepy, \
+    x, y, dx, dy, \
+    width \
+  ); \
+  data[y*width*3 + x*3 + 0] = real_to_byte(n.x); \
+  data[y*width*3 + x*3 + 1] = real_to_byte(n.y); \
+  data[y*width*3 + x*3 + 2] = real_to_byte(n.z); \
+}\
+/////////////////////////////////////////////////////////////////////////////
+  int y = 0;
+  for (y = 0; y < height - 1; y++) {
+    int x = 0;
+    for (x; x < width - 1; x++) {
+      OUTPUT_NORMAL(x, y, 1, 1);
     }
+    OUTPUT_NORMAL(x, y, -1, 1);
   }
-  
-  // for (int x = 0; x < width; ++x) {
-  //     for (int y = 0; y < height; ++y) {
-  //       const glm::vec3 n = compute_normal(process.bitmap, width, height, x, y);
-  //       // convert to rgb
-  //       data[y*width*3 + x*3 + 0] = float_to_char(n.x);
-  //       data[y*width*3 + x*3 + 1] = float_to_char(n.y);
-  //       data[y*width*3 + x*3 + 2] = float_to_char(n.z);
-  //     }
-  // }
+
+  int x = 0;
+  for (x; x < width - 1; x++) {
+    OUTPUT_NORMAL(x, y, 1, -1);
+  }
+  OUTPUT_NORMAL(x, y, -1, -1);
+
+/////////////////////////////////////////////////////////////////////////////
+#undef OUTPUT_NORMAL
+/////////////////////////////////////////////////////////////////////////////
+
   stbi_write_png(file_name.c_str(), width, height, 3, data.data(), 0);
 }
 
@@ -419,8 +433,9 @@ void process_normalmap(process_t& process, const std::string& input, const std::
 
     real coverage = process_bin_to_bitmap(process, input_as_bin);
 
-    // we plotted less than 90% of the bitmap, bail out.
-    if (coverage < 0.9) {
+    // we plotted less than 99% of the bitmap, bail out.
+    std::cout << "computed coverage " << coverage << std::endl;
+    if (coverage < 0.99) {
       if (!process.previous_bitmap.empty()) {
         process.swap_bitmap();
       }
@@ -440,7 +455,7 @@ void process_normalmap(process_t& process, const std::string& input, const std::
     if (split >= 2048) {
       break;
     }
-    split *= 2;
+    split = split * 2;
     process_bitmap_double(process);
   }
   std::cout << "xv_xyz_grid: process_bitmap_negate" << std::endl;
@@ -453,13 +468,13 @@ void process_normalmap(process_t& process, const std::string& input, const std::
 void process_xvb(process_t& process, const std::string& input, const std::string& input_as_bin) {
   vec3 len           = process.aabb.len();
   real bitmap_ratio  = len.x / len.y;
-  int  split         = process.simplifySplit;
-  
+  int  split         = process.simplify_split;
+
   process.bitmap_width  = (int)glm::max<real>((split * bitmap_ratio), 4);
   process.bitmap_height = (int)glm::max<real>((split * (1 / bitmap_ratio)), 4);
 
   process.bitmap.resize(process.bitmap_width * process.bitmap_height, REAL_MAX);
-  
+
   std::cout << "xv_xyz_grid: process_bin_to_bitmap" << std::endl;
   process_bin_to_bitmap(process, input_as_bin);
   std::cout << "xv_xyz_grid: process_bitmap_negate" << std::endl;
@@ -489,7 +504,7 @@ int main(int ac, char **av) {
       return -1;
     }
 
-    if (process.generateNormal) {
+    if (process.generate_normal) {
       process_normalmap(process, input, input_as_bin);
     } else {
       process_xvb(process, input, input_as_bin);
