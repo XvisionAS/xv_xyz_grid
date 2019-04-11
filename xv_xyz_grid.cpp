@@ -218,14 +218,28 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
     }
   }
 
-  size_t  size = process.bitmap.size();
+  size_t  size  = 0;
   size_t  empty = 0;
-  for (size_t i = 0; i < size; ++i) {
-    real c = count[i];
-    if (c > 0) {
-      process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
-    } else {
-      empty++;
+  for (int y = 0; y < height; ++y) {
+    int offset  = y * width;
+    
+    int start_x = 0;
+    int end_x   = width - 1;
+
+    for (; (start_x < width) && (count[offset + start_x] == 0); ++start_x);
+    for (; (end_x > start_x) && (count[offset + end_x]   == 0); --end_x  );
+    
+    if (start_x < end_x) {
+      for(int x = start_x; x <= end_x; ++x) {
+        int  i = offset + x;
+        real c = count[i];
+        if (c > 0) {
+          process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
+        } else {
+          empty++;
+        }
+      }
+      size += (end_x - start_x) + 1;
     }
   }
   return 1.0 - ((real) empty / (real) size);
@@ -361,9 +375,18 @@ vec3 compute_normal(const process_t& process, const std::vector<real>& image, re
   int ax = x, ay = y;
   int bx = x + dx, by = y;
   int cx = x, cy = y + dy;
-  vec3 a(ax * stepx, ay * stepy, image[ax + ay * width]);
-  vec3 b(bx * stepx, by * stepy, image[bx + by * width]);
-  vec3 c(cx * stepx, cy * stepy, image[cx + cy * width]);
+
+  real af = image[ax + ay * width];
+  real bf = image[bx + by * width];
+  real cf = image[cx + cy * width];
+
+  if (af == REAL_MAX || bf == REAL_MAX || cf == REAL_MAX) {
+    return vec3(0, 0, 1);
+  }
+
+  vec3 a(ax * stepx, ay * stepy, af);
+  vec3 b(bx * stepx, by * stepy, bf);
+  vec3 c(cx * stepx, cy * stepy, cf);
 
   vec3 ab = b - a;
   vec3 ac = c - a;
@@ -435,7 +458,7 @@ void process_normalmap(process_t& process, const std::string& input, const std::
 
     // we plotted less than 99% of the bitmap, bail out.
     std::cout << "computed coverage " << coverage << std::endl;
-    if (coverage < 0.99) {
+    if (coverage < 0.9) {
       if (!process.previous_bitmap.empty()) {
         process.swap_bitmap();
       }
@@ -447,10 +470,16 @@ void process_normalmap(process_t& process, const std::string& input, const std::
       name << input << "." << split << ".normal.png";
       process_generate_normalmap(process, name.str());
     }
-    {
+    { 
       std::stringstream name;
       name << input << "." << split << ".png";
       process_bitmap_to_png(process, name.str());
+    }
+    if (coverage < 0.2) {
+      if (!process.previous_bitmap.empty()) {
+        process.swap_bitmap();
+      }
+      break;
     }
     if (split >= 2048) {
       break;
