@@ -220,20 +220,22 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
 
   size_t  size  = 0;
   size_t  empty = 0;
+
+  const real limits = 1;
   for (int y = 0; y < height; ++y) {
     int offset  = y * width;
     
     int start_x = 0;
     int end_x   = width - 1;
 
-    for (; (start_x < width) && (count[offset + start_x] == 0); ++start_x);
-    for (; (end_x > start_x) && (count[offset + end_x]   == 0); --end_x  );
+    for (; (start_x < width) && (count[offset + start_x] < limits); ++start_x);
+    for (; (end_x > start_x) && (count[offset + end_x]   < limits); --end_x  );
     
     if (start_x < end_x) {
       for(int x = start_x; x <= end_x; ++x) {
         int  i = offset + x;
         real c = count[i];
-        if (c > 0) {
+        if (c >= 1) {
           process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
         } else {
           empty++;
@@ -371,7 +373,7 @@ vec3 compute_normal_sobel(const process_t& process, const std::vector<real>& ima
   return glm::normalize(vec3(dX, dY, process.normal_z));
 }
 
-vec3 compute_normal(const process_t& process, const std::vector<real>& image, real stepx, real stepy, int x, int y, int dx, int dy, int width) {
+bool compute_normal(vec3& normal, const process_t& process, const std::vector<real>& image, real stepx, real stepy, int x, int y, int dx, int dy, int width) {
   int ax = x, ay = y;
   int bx = x + dx, by = y;
   int cx = x, cy = y + dy;
@@ -381,7 +383,8 @@ vec3 compute_normal(const process_t& process, const std::vector<real>& image, re
   real cf = image[cx + cy * width];
 
   if (af == REAL_MAX || bf == REAL_MAX || cf == REAL_MAX) {
-    return vec3(0, 0, 1);
+    normal = vec3(0, 0, 1);
+    return false;
   }
 
   vec3 a(ax * stepx, ay * stepy, af);
@@ -391,9 +394,10 @@ vec3 compute_normal(const process_t& process, const std::vector<real>& image, re
   vec3 ab = b - a;
   vec3 ac = c - a;
 
-  return glm::normalize(
+  normal = glm::normalize(
     glm::cross(ab, ac)
   );
+  return true;
 }
 
 void process_generate_normalmap(const process_t& process, const std::string& file_name) {
@@ -408,16 +412,20 @@ void process_generate_normalmap(const process_t& process, const std::string& fil
   // std::vector<double> bitmap = apply_filter(process.bitmap, width, height, filter);
   const auto& bitmap = process.bitmap;
   std::vector<uint8> data;
-  data.resize(width * height * 3, 255);
+  data.resize(width * height * 4, 255);
 /////////////////////////////////////////////////////////////////////////////
 #define OUTPUT_NORMAL(x, y, dx, dy) {\
-  vec3 n = compute_normal(process, bitmap, stepx, stepy, \
+  vec3 n; \
+  bool v = compute_normal(\
+    n, \
+    process, bitmap, stepx, stepy, \
     x, y, dx, dy, \
     width \
   ); \
-  data[y*width*3 + x*3 + 0] = real_to_byte(n.x); \
-  data[y*width*3 + x*3 + 1] = real_to_byte(n.y); \
-  data[y*width*3 + x*3 + 2] = real_to_byte(n.z); \
+  data[y*width*4 + x*4 + 0] = real_to_byte(n.x); \
+  data[y*width*4 + x*4 + 1] = real_to_byte(n.y); \
+  data[y*width*4 + x*4 + 2] = real_to_byte(n.z); \
+  data[y*width*4 + x*4 + 3] = v ? 255 : 0; \
 }\
 /////////////////////////////////////////////////////////////////////////////
   int y = 0;
@@ -439,7 +447,7 @@ void process_generate_normalmap(const process_t& process, const std::string& fil
 #undef OUTPUT_NORMAL
 /////////////////////////////////////////////////////////////////////////////
 
-  stbi_write_png(file_name.c_str(), width, height, 3, data.data(), 0);
+  stbi_write_png(file_name.c_str(), width, height, 4, data.data(), 0);
 }
 
 void process_normalmap(process_t& process, const std::string& input, const std::string& input_as_bin) {
@@ -474,12 +482,6 @@ void process_normalmap(process_t& process, const std::string& input, const std::
       std::stringstream name;
       name << input << "." << split << ".png";
       process_bitmap_to_png(process, name.str());
-    }
-    if (coverage < 0.2) {
-      if (!process.previous_bitmap.empty()) {
-        process.swap_bitmap();
-      }
-      break;
     }
     if (split >= 2048) {
       break;
