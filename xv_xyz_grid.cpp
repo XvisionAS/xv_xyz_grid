@@ -466,7 +466,7 @@ void process_normalmap(process_t& process, const std::string& input, const std::
 
     // we plotted less than 99% of the bitmap, bail out.
     std::cout << "computed coverage " << coverage << std::endl;
-    if (coverage < 0.9) {
+    if (coverage < 0.2) {
       if (!process.previous_bitmap.empty()) {
         process.swap_bitmap();
       }
