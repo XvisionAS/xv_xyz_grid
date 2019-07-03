@@ -221,7 +221,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   size_t  size  = 0;
   size_t  empty = 0;
 
-  const real limits = 1;
+  const real limits = 0;
   for (int y = 0; y < height; ++y) {
     int offset  = y * width;
 
