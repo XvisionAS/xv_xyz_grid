@@ -224,18 +224,18 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   const real limits = 1;
   for (int y = 0; y < height; ++y) {
     int offset  = y * width;
-    
+
     int start_x = 0;
     int end_x   = width - 1;
 
     for (; (start_x < width) && (count[offset + start_x] < limits); ++start_x);
     for (; (end_x > start_x) && (count[offset + end_x]   < limits); --end_x  );
-    
+
     if (start_x < end_x) {
       for(int x = start_x; x <= end_x; ++x) {
         int  i = offset + x;
         real c = count[i];
-        if (c >= 1) {
+        if (c > 0) {
           process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
         } else {
           empty++;
@@ -478,7 +478,7 @@ void process_normalmap(process_t& process, const std::string& input, const std::
       name << input << "." << split << ".normal.png";
       process_generate_normalmap(process, name.str());
     }
-    { 
+    {
       std::stringstream name;
       name << input << "." << split << ".png";
       process_bitmap_to_png(process, name.str());
