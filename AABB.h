@@ -33,6 +33,10 @@ struct AABB {
 			p.z > min.z && p.z <= max.z;
 	}
 
+	bool contains2d(const vec3 &p) {
+		return p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y;
+	}
+
 	bool contains(const AABB& bb) {
 		if (bb.min.x > max.x || bb.max.x < min.x)
 			return false;

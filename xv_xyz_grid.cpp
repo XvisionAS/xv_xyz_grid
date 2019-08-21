@@ -66,6 +66,8 @@ struct process_t {
   bool                      always_negate;
   bool                      generate_normal;
   AABB                      aabb;
+  AABB                      aabb_limit;
+  bool                      aabb_limit_valid;
   int                       point_count;
   real                      normal_z;
   std::vector<real>         bitmap;
@@ -110,6 +112,12 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
     false,
     false);
 
+  cmdparser.add<std::string>("view",
+    'v',
+    "Limit export to AABB format : min_x:min_y:min_z:max_x:max_y:max_z",
+    false
+  );
+
   cmdparser.parse_check(ac, av);
 
   process.inputs                   = cmdparser.rest();
@@ -117,6 +125,19 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   process.simplify_split_use_ratio = cmdparser.get<bool>("simplify-split-use-ratio");
   process.always_negate            = cmdparser.get<bool>("always-negate");
   process.generate_normal          = cmdparser.get<bool>("generate-normal");
+
+  std::stringstream         view(cmdparser.get<std::string>("view"));
+  std::vector<double>       aabb;
+  std::string               element;
+
+  while (std::getline(view, element, ':')) {
+    aabb.push_back(atof(element.c_str()));
+  }
+  process.aabb_limit_valid = aabb.size() == 6;
+  if (process.aabb_limit_valid) {
+    process.aabb_limit.add(vec3(aabb[0], aabb[1], aabb[2]));
+    process.aabb_limit.add(vec3(aabb[3], aabb[4], aabb[5]));
+  }
 }
 
 
@@ -125,7 +146,6 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
     std::ifstream input(inputFileName);
     std::ofstream output(outputFileName, std::ios::binary | std::ios::out);
 
-    process.point_count = 0;
     for (std::string line; std::getline(input, line); ) {
       size_t comment = line.find("#");
       if (comment > 0) {
@@ -135,8 +155,6 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
         vec3  p;
         if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
           output.write((char*)&p, sizeof(p));
-          process.point_count++;
-          process.aabb.add(p);
         }
       }
     }
@@ -146,7 +164,11 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
 void process_bin_get_aabb(process_t& process, const std::string& input_as_bin) {
   std::ifstream input(input_as_bin, std::ios::binary | std::ios::in);
   vec3 p;
+  process.point_count = 0;
   while (input.read((char*)&p, sizeof(p))) {
+    if (process.aabb_limit_valid && !process.aabb_limit.contains2d(p)) {
+      continue;
+    }
     process.point_count++;
     process.aabb.add(p);
   }
@@ -178,6 +200,9 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   count.resize(process.bitmap.size(), 0);
 
   while (input.read((char*)&p, sizeof(p))) {
+    if (process.aabb_limit_valid && !process.aabb.contains2d(p)) {
+      continue;
+    }
     real x = (p.x - process.aabb.min.x) * ratio.x;
     real y = (p.y - process.aabb.min.y) * ratio.y;
     real z = (p.z - process.aabb.min.z) * z_factor ;
@@ -525,11 +550,14 @@ int main(int ac, char **av) {
   for (size_t arg = 0; arg < process.inputs.size(); arg++) {
     const std::string& input        = process.inputs[arg];
     const std::string& input_as_bin = input + ".bin";
+
     std::cout << "xv_xyz_grid: process_xyz_to_bin" << std::endl;
     process_xyz_to_bin(process, input, input_as_bin);
     std::cout << "xv_xyz_grid: process_bin_get_aabb" << std::endl;
+
     process_bin_get_aabb(process, input_as_bin);
 
+    std::cout << "AABB = " << std::fixed << process.aabb.min.x << ":" << process.aabb.min.y << ":" << process.aabb.min.z << ":" << process.aabb.max.x << ":" << process.aabb.max.y << ":" << process.aabb.max.z << std::endl;
     if (process.point_count == 0) {
       std::cout << "Was not able to read any data." << std::endl;
       return -1;
