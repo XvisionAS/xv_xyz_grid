@@ -262,7 +262,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
       for(int x = start_x; x <= end_x; ++x) {
         int  i = offset + x;
         real c = count[i];
-        if (c > 0.05) {
+        if (c > 0) {
           process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
         } else {
           empty++;
@@ -454,21 +454,31 @@ void process_generate_normalmap(const process_t& process, const std::string& fil
   data[y*width*4 + x*4 + 2] = real_to_byte(n.z); \
   data[y*width*4 + x*4 + 3] = v ? 255 : 0; \
 }\
+
 /////////////////////////////////////////////////////////////////////////////
-  int y = 0;
+  int y;
   for (y = 0; y < height - 1; y++) {
-    int x = 0;
-    for (x; x < width - 1; x++) {
+    int x;
+    for (x = 0; x < width - 1; x++) {
       OUTPUT_NORMAL(x, y, 1, 1);
     }
-    OUTPUT_NORMAL(x, y, -1, 1);
   }
 
-  int x = 0;
-  for (x; x < width - 1; x++) {
-    OUTPUT_NORMAL(x, y, 1, -1);
+  int x = width - 1;
+  for (y = 0; y < height; y++) {
+    data[y*width*4 + x*4 + 0] = data[y*width*4 + (x - 1)*4 + 0];
+    data[y*width*4 + x*4 + 1] = data[y*width*4 + (x - 1)*4 + 1];
+    data[y*width*4 + x*4 + 2] = data[y*width*4 + (x - 1)*4 + 2];
+    data[y*width*4 + x*4 + 3] = data[y*width*4 + (x - 1)*4 + 3];
   }
-  OUTPUT_NORMAL(x, y, -1, -1);
+  y = height - 1;
+  for (x = 0; x < width; ++x) {
+    data[y*width*4 + x*4 + 0] = data[(y-1)*width*4 + x *4 + 0];
+    data[y*width*4 + x*4 + 1] = data[(y-1)*width*4 + x *4 + 1];
+    data[y*width*4 + x*4 + 2] = data[(y-1)*width*4 + x *4 + 2];
+    data[y*width*4 + x*4 + 3] = data[(y-1)*width*4 + x *4 + 3];
+  }
+
 
 /////////////////////////////////////////////////////////////////////////////
 #undef OUTPUT_NORMAL
