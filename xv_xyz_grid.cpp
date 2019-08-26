@@ -130,13 +130,15 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   std::vector<double>       aabb;
   std::string               element;
 
+
   while (std::getline(view, element, ':')) {
     aabb.push_back(atof(element.c_str()));
   }
   process.aabb_limit_valid = aabb.size() == 4;
   if (process.aabb_limit_valid) {
-    process.aabb_limit.add(vec3(aabb[0], aabb[1], -std::numeric_limits<real>::max()));
-    process.aabb_limit.add(vec3(aabb[3], aabb[4], std::numeric_limits<real>::max()));
+    std::cout << element.c_str() << std::endl;
+    process.aabb_limit.add(vec3(aabb[0], aabb[1], -1));
+    process.aabb_limit.add(vec3(aabb[3], aabb[4], 1));
   }
 }
 
