@@ -262,7 +262,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
       for(int x = start_x; x <= end_x; ++x) {
         int  i = offset + x;
         real c = count[i];
-        if (c > 0) {
+        if (c > 0.05) {
           process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
         } else {
           empty++;
