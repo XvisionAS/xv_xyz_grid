@@ -114,7 +114,7 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
 
   cmdparser.add<std::string>("view",
     'v',
-    "Limit export to AABB format : min_x:min_y:min_z:max_x:max_y:max_z",
+    "Limit export to AABB format : min_x:min_y:max_x:max_y",
     false
   );
 
@@ -133,10 +133,10 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   while (std::getline(view, element, ':')) {
     aabb.push_back(atof(element.c_str()));
   }
-  process.aabb_limit_valid = aabb.size() == 6;
+  process.aabb_limit_valid = aabb.size() == 4;
   if (process.aabb_limit_valid) {
-    process.aabb_limit.add(vec3(aabb[0], aabb[1], aabb[2]));
-    process.aabb_limit.add(vec3(aabb[3], aabb[4], aabb[5]));
+    process.aabb_limit.add(vec3(aabb[0], aabb[1], -std::numeric_limits<real>::max()));
+    process.aabb_limit.add(vec3(aabb[3], aabb[4], std::numeric_limits<real>::max()));
   }
 }
 
