@@ -264,7 +264,8 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
         real c = count[i];
         if (c > 0) {
           process.bitmap[i] = (bitmap[i] / count[i]) * z_len + process.aabb.min.z;
-        } else {
+        }
+        if (c < 1) {
           empty++;
         }
       }
