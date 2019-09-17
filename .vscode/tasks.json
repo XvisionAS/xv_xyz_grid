@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [{
+    "label": "build",
+    "type": "shell",
+    "command": "g++",
+    "args": [
+      "-g", "xv_xyz_grid.cpp",
+      "-I", "Externals",
+      "-o", "xv_xyz_grid"
+    ],
+    "group": {
+      "kind": "build",
+      "isDefault": true
+    }
+  }]
+}

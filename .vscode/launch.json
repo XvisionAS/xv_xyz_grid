@@ -1,0 +1,44 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb-mi",
+      "request": "launch",
+      "name": "Launch Program",
+      "target": "${workspaceFolder}/xv_xyz_grid",
+      "cwd": "${workspaceRoot}",
+      "arguments": "${workspaceFolder}/data/seabed -n 1 -v 400500.000000:7180900.000000:411400.000000:7201700.000000",
+      "preLaunchTask":"build",
+      "valuesFormatting": "prettyPrinters"
+    },
+    {
+      "name": "(gdb) Launch",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/xv_xyz_grid",
+      "args": [
+        "${workspaceFolder}/data/seabed",
+        "-n",
+        "1",
+        "-v",
+        "400500.000000:7180900.000000:251.389893:411400.000000:7201700.000000:304.118713"
+      ],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}",
+      "environment": [],
+      "externalConsole": true,
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask":"build"
+    }
+  ]
+}

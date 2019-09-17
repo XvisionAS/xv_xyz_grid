@@ -86,6 +86,13 @@ struct process_t {
   }
 };
 
+void print_aabb(const std::string& pre, const AABB& aabb) {
+  std::cout << pre << std::fixed << std::setprecision(4);
+  std::cout << " ("<< aabb.min.x << ", " << aabb.min.y;
+  std::cout << ") -> ("; 
+  std::cout << aabb.max.x << ", " << aabb.max.y << ")" << std::endl;
+}
+
 void parse_cmd_line(int ac, char** av, process_t& process) {
   cmdline::parser cmdparser;
   cmdparser.add<int>("simplify-split",
@@ -134,11 +141,12 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   while (std::getline(view, element, ':')) {
     aabb.push_back(atof(element.c_str()));
   }
-  process.aabb_limit_valid = aabb.size() == 4;
+  process.aabb_limit_valid = (aabb.size() >= 4);
   if (process.aabb_limit_valid) {
-    std::cout << element.c_str() << std::endl;
+    int offset = (aabb.size() == 4) ? 0 : 1;
     process.aabb_limit.add(vec3(aabb[0], aabb[1], -1));
-    process.aabb_limit.add(vec3(aabb[3], aabb[4], 1));
+    process.aabb_limit.add(vec3(aabb[2 + offset], aabb[3 + offset], 1));
+    print_aabb("AABB Limit", process.aabb_limit);
   }
 }
 
@@ -498,7 +506,7 @@ void process_normalmap(process_t& process, const std::string& input, const std::
   process.bitmap.resize(process.bitmap_width * process.bitmap_height, REAL_MAX);
 
   while (true) {
-    std::cout << "xv_xyz_grid: process_bin_to_bitmap " << split << std::endl;
+    std::cout << "process_bin_to_bitmap " << split << std::endl;
 
     real coverage = process_bin_to_bitmap(process, input_as_bin);
 
@@ -527,10 +535,10 @@ void process_normalmap(process_t& process, const std::string& input, const std::
     split = split * 2;
     process_bitmap_double(process);
   }
-  std::cout << "xv_xyz_grid: process_bitmap_negate" << std::endl;
+  std::cout << "process_bitmap_negate" << std::endl;
   process_bitmap_negate(process);
 
-  std::cout << "xv_xyz_grid: process_generate_normalmap" << std::endl;
+  std::cout << "process_generate_normalmap" << std::endl;
   process_generate_normalmap(process, input + ".normal.png");
 }
 
@@ -544,14 +552,14 @@ void process_xvb(process_t& process, const std::string& input, const std::string
 
   process.bitmap.resize(process.bitmap_width * process.bitmap_height, REAL_MAX);
 
-  std::cout << "xv_xyz_grid: process_bin_to_bitmap" << std::endl;
+  std::cout << "process_bin_to_bitmap" << std::endl;
   process_bin_to_bitmap(process, input_as_bin);
-  std::cout << "xv_xyz_grid: process_bitmap_negate" << std::endl;
+  std::cout << "process_bitmap_negate" << std::endl;
   process_bitmap_negate(process);
-  std::cout << "xv_xyz_grid: process_bitmap_to_png" << std::endl;
+  std::cout << "process_bitmap_to_png" << std::endl;
   process_bitmap_to_png(process, input + ".before.png");
   // process_fill_bitmap(process);
-  std::cout << "xv_xyz_grid: process_bitmap_to_xvb" << std::endl;
+  std::cout << "process_bitmap_to_xvb" << std::endl;
   process_bitmap_to_xvb(process, input + ".xvb");
 }
 
@@ -564,13 +572,14 @@ int main(int ac, char **av) {
     const std::string& input        = process.inputs[arg];
     const std::string& input_as_bin = input + ".bin";
 
-    std::cout << "xv_xyz_grid: process_xyz_to_bin" << std::endl;
+    std::cout << "process_xyz_to_bin" << std::endl;
     process_xyz_to_bin(process, input, input_as_bin);
-    std::cout << "xv_xyz_grid: process_bin_get_aabb" << std::endl;
+    std::cout << "process_bin_get_aabb" << std::endl;
 
     process_bin_get_aabb(process, input_as_bin);
 
-    std::cout << "AABB = " << std::fixed << process.aabb.min.x << ":" << process.aabb.min.y << ":" << process.aabb.min.z << ":" << process.aabb.max.x << ":" << process.aabb.max.y << ":" << process.aabb.max.z << std::endl;
+    print_aabb("AABB Dataset", process.aabb);
+
     if (process.point_count == 0) {
       std::cout << "Was not able to read any data." << std::endl;
       return -1;
