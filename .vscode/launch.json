@@ -10,7 +10,7 @@
       "name": "Launch Program",
       "target": "${workspaceFolder}/xv_xyz_grid",
       "cwd": "${workspaceRoot}",
-      "arguments": "${workspaceFolder}/data/seabed -n 1 -v 400500.000000:7180900.000000:411400.000000:7201700.000000",
+      "arguments": "${workspaceFolder}/data/test.xyz -n 1",
       "preLaunchTask":"build",
       "valuesFormatting": "prettyPrinters"
     },
@@ -20,11 +20,9 @@
       "request": "launch",
       "program": "${workspaceFolder}/xv_xyz_grid",
       "args": [
-        "${workspaceFolder}/data/seabed",
+        "${workspaceFolder}/data/test.xyz",
         "-n",
         "1",
-        "-v",
-        "400500.000000:7180900.000000:251.389893:411400.000000:7201700.000000:304.118713"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

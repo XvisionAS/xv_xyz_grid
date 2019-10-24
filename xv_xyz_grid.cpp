@@ -20,6 +20,8 @@
 #include <stb_image_write.h>
 ///////////////////////////////////////////////////////////////////////////////
 
+#include <zstr.hpp>
+
 #ifdef _WIN32
   #include <io.h>
   #define access    _access_s
@@ -154,7 +156,7 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
 void process_xyz_to_bin(process_t& process, const std::string& inputFileName, const std::string& outputFileName) {
   if (!file_exists(outputFileName)) {
     std::ifstream input(inputFileName);
-    std::ofstream output(outputFileName, std::ios::binary | std::ios::out);
+    zstr::ofstream output(outputFileName, std::ios::binary | std::ios::out);
 
     for (std::string line; std::getline(input, line); ) {
       size_t comment = line.find("#");
@@ -172,8 +174,8 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
 }
 
 void process_bin_get_aabb(process_t& process, const std::string& input_as_bin) {
-  std::ifstream input(input_as_bin, std::ios::binary | std::ios::in);
-  vec3 p;
+  zstr::ifstream input(input_as_bin, std::ios::binary | std::ios::in);
+  vec3           p;
   process.point_count = 0;
   while (input.read((char*)&p, sizeof(p))) {
     if (process.aabb_limit_valid && !process.aabb_limit.contains2d(p)) {
@@ -191,8 +193,8 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   int                 height = process.bitmap_height;
   vec3                ratio  = vec3(process.bitmap_width - 1, process.bitmap_height - 1, 1) / len;
   vec3                p;
-  std:: ifstream      input(input_as_bin, std::ios::binary | std::ios::in);
-  std:: vector<real>  count;
+  zstr::ifstream      input(input_as_bin, std::ios::binary | std::ios::in);
+  std::vector<real>   count;
   real                z_len    = len.z > 0 ? len.z : 1;
   real                z_factor = 1.0 / z_len;
 
