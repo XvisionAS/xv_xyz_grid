@@ -4,6 +4,8 @@ os:
 environment:
   matrix:
     - TOOLSET: vs2015
+      PRJ_GEN: "Visual Studio 14 2015 Win64"
+      BDIR: vs2015
 
 install:
   - git submodule update --init --recursive
@@ -11,8 +13,7 @@ install:
 
 configuration: Release
 
-before_build:
-  - mkdir build.%BDIR% && cd build.%BDIR%
+before_build:  
   - appveyor DownloadFile https://raw.githubusercontent.com/horta/zlib.install/master/install.bat
   - install.bat
 
