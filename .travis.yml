@@ -19,7 +19,7 @@ addons:
       - gcc-5-multilib
       - g++-5-multilib
       - libssl-dev
-      - zlib-dev
+      - zlib1g-dev
       - linux-libc-dev:i386
 
     sources:
