@@ -35,9 +35,14 @@ static std::string strerror()
     }
 #else
 // GNU-specific strerror_r()
-    auto p = strerror_r(errno, &buff[0], buff.size());
-    std::string tmp(p, std::strlen(p));
-    std::swap(buff, tmp);
+// XSI-compliant strerror_r()
+    if (strerror_r(errno, &buff[0], buff.size()) != 0)
+    {
+        buff = "Unknown error";
+    }
+    // auto p = strerror_r(errno, &buff[0], buff.size());
+    // std::string tmp(p, std::strlen(p));
+    // std::swap(buff, tmp);
 #endif
     buff.resize(buff.find('\0'));
     return buff;
