@@ -1,0 +1,1 @@
+gcc -O3 xv_xyz_grid.cpp -I Externals/ -lstdc++ -lm -lz -o xv_xyz_grid
