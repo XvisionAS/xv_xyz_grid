@@ -73,7 +73,7 @@ struct process_t {
   std::vector<real>         bitmap;
   int                       bitmap_width;
   int                       bitmap_height;
-
+  bool                      export_bbox;
 
   std::vector<real>         previous_bitmap;
   int                       previous_bitmap_width;
@@ -125,6 +125,13 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
     false
   );
 
+  cmdparser.add<bool>("export-bbox",
+    'e',
+    "Export bounding box as JSON, format { min_x, min_y, min_z, max_x, max_y, max_z}",
+    false,
+    true
+  );
+
   cmdparser.parse_check(ac, av);
 
   process.inputs                   = cmdparser.rest();
@@ -132,6 +139,7 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   process.simplify_split_use_ratio = cmdparser.get<bool>("simplify-split-use-ratio");
   process.always_negate            = cmdparser.get<bool>("always-negate");
   process.generate_normal          = cmdparser.get<bool>("generate-normal");
+  process.export_bbox              = cmdparser.get<bool>("export-bbox");
 
   std::stringstream         view(cmdparser.get<std::string>("view"));
   std::vector<double>       aabb;
@@ -542,6 +550,19 @@ void process_normalmap(process_t& process, const std::string& input, const std::
   process_generate_normalmap(process, input + ".normal.png");
 }
 
+void process_export_bbox(process_t& process, const std::string& input, const std::string& input_as_bin) {
+  std::string out_file = input + ".json";
+  std::ofstream output(out_file.c_str(), std::ios_base::trunc);
+  output << "{" << std::endl << std::fixed;
+  output << "\t\"min_x\":" << process.aabb.min.x << "," << std::endl;
+  output << "\t\"min_y\":" << process.aabb.min.y << "," << std::endl;
+  output << "\t\"min_z\":" << process.aabb.min.z << "," << std::endl;
+  output << "\t\"max_x\":" << process.aabb.max.x << "," << std::endl;
+  output << "\t\"max_y\":" << process.aabb.max.y << "," << std::endl;
+  output << "\t\"max_z\":" << process.aabb.max.z << std::endl;
+  output << "}" << std::endl;
+}
+
 void process_xvb(process_t& process, const std::string& input, const std::string& input_as_bin) {
   vec3 len           = process.aabb.len();
   real bitmap_ratio  = len.x / len.y;
@@ -589,6 +610,10 @@ int main(int ac, char **av) {
       process_normalmap(process, input, input_as_bin);
     } else {
       process_xvb(process, input, input_as_bin);
+    }
+
+    if (process.export_bbox) {
+      process_export_bbox(process, input, input_as_bin);
     }
 
   }
