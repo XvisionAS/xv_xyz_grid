@@ -17,6 +17,16 @@
 namespace strict_fstream
 {
 
+char* check_error(int result, char* buffer, int err) {
+    if(result)
+        sprintf(buffer, "unknown error: %d", err);
+    return buffer;
+}
+
+char* check_error(char* result, char*, int) {
+    return result;
+}
+
 /// Overload of error-reporting function, to enable use with VS.
 /// Ref: http://stackoverflow.com/a/901316/717706
 static std::string strerror()
@@ -35,7 +45,7 @@ static std::string strerror()
     }
 #else
 // GNU-specific strerror_r()
-    auto p = strerror_r(errno, &buff[0], buff.size());
+    auto p = check_error(strerror_r(errno, &(buff[0]), buff.size()), &(buff[0]), errno);
     std::string tmp(p, std::strlen(p));
     std::swap(buff, tmp);
 #endif
