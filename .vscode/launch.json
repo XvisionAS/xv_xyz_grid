@@ -5,16 +5,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "lldb-mi",
-      "request": "launch",
-      "name": "Launch Program",
-      "target": "${workspaceFolder}/xv_xyz_grid",
-      "cwd": "${workspaceRoot}",
-      "arguments": "${workspaceFolder}/data/test.xyz -n 1",
-      "preLaunchTask":"build",
-      "valuesFormatting": "prettyPrinters"
-    },
-    {
       "name": "(gdb) Launch",
       "type": "cppdbg",
       "request": "launch",
@@ -23,6 +13,7 @@
         "${workspaceFolder}/data/test.xyz",
         "-n",
         "1",
+        "-a 26:36"
       ],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",

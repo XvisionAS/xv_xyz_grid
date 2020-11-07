@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <cstdint>
 #include <chrono>
+#include <functional>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/epsilon.hpp>
@@ -63,7 +64,8 @@ struct process_t {
 
   }
   std::vector<std::string>  inputs;
-  int                       simplify_split;
+  int                       simplify_split_x;
+  int                       simplify_split_y;
   bool                      simplify_split_use_ratio;
   bool                      always_negate;
   bool                      generate_normal;
@@ -94,14 +96,22 @@ void print_aabb(const std::string& pre, const AABB& aabb) {
   std::cout << ") -> ("; 
   std::cout << aabb.max.x << ", " << aabb.max.y << ")" << std::endl;
 }
+template<typename T>
+void split_array(const std::string& string, char delimiter, std::function<T(const char*)> converter, std::vector<T>& output) {
+  std::string       element;
+  std::stringstream stream(string);
+  while (std::getline(stream, element, delimiter)) {
+    output.push_back(converter(element.c_str()));
+  }
+}
 
 void parse_cmd_line(int ac, char** av, process_t& process) {
   cmdline::parser cmdparser;
-  cmdparser.add<int>("simplify-split",
+  cmdparser.add<std::string>("simplify-split",
     'a',
     "Number of split used to generate the simplification grid",
     false,
-    256);
+    "256");
 
   cmdparser.add<bool>("simplify-split-use-ratio",
     'b',
@@ -137,20 +147,39 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   cmdparser.parse_check(ac, av);
 
   process.inputs                   = cmdparser.rest();
-  process.simplify_split           = cmdparser.get<int>("simplify-split");
-  process.simplify_split_use_ratio = cmdparser.get<bool>("simplify-split-use-ratio");
+  
+  std::string      simplify_split       = cmdparser.get<std::string>("simplify-split");
+  std::vector<int> splits;
+
+  split_array<int>(simplify_split, ':', atoi, splits);
+
+  if (splits.size() == 2) {
+    process.simplify_split_x         = splits[0];
+    process.simplify_split_y         = splits[1];
+    process.simplify_split_use_ratio = false;
+  } else {
+    process.simplify_split_x         = splits[0];
+    process.simplify_split_y         = process.simplify_split_x;
+    process.simplify_split_use_ratio = cmdparser.get<bool>("simplify-split-use-ratio");    
+  }
+
+  if (process.simplify_split_use_ratio) {
+    std::cout << "Using rationed output size x = " << process.simplify_split_x << std::endl;
+  } else {
+    std::cout << "Using output size x = " << process.simplify_split_x << "y =" << process.simplify_split_y << std::endl;
+  }
+
+
   process.always_negate            = cmdparser.get<bool>("always-negate");
   process.generate_normal          = cmdparser.get<bool>("generate-normal");
   process.export_bbox              = cmdparser.get<bool>("export-bbox");
 
-  std::stringstream         view(cmdparser.get<std::string>("view"));
+  std::string               view   = cmdparser.get<std::string>("view");
   std::vector<double>       aabb;
   std::string               element;
 
+  split_array<double>(view, ':', atof, aabb);
 
-  while (std::getline(view, element, ':')) {
-    aabb.push_back(atof(element.c_str()));
-  }
   process.aabb_limit_valid = (aabb.size() >= 4);
   if (process.aabb_limit_valid) {
     int offset = (aabb.size() == 4) ? 0 : 1;
@@ -568,10 +597,17 @@ void process_export_bbox(process_t& process, const std::string& input, const std
 void process_xvb(process_t& process, const std::string& input, const std::string& input_as_bin) {
   vec3 len           = process.aabb.len();
   real bitmap_ratio  = len.x / len.y;
-  int  split         = process.simplify_split;
+  
+  int  split_x       = process.simplify_split_x;
+  int  split_y       = process.simplify_split_y;
 
-  process.bitmap_width  = (int)glm::max<real>((split * bitmap_ratio), 4);
-  process.bitmap_height = (int)glm::max<real>((split * (1 / bitmap_ratio)), 4);
+  if (process.simplify_split_use_ratio) {
+    split_x *= bitmap_ratio;
+    split_y *= 1 / bitmap_ratio;
+  }
+
+  process.bitmap_width  = (int)glm::max<real>((split_x * bitmap_ratio), 4);
+  process.bitmap_height = (int)glm::max<real>((split_y * (1 / bitmap_ratio)), 4);
 
   process.bitmap.resize(process.bitmap_width * process.bitmap_height, REAL_MAX);
 

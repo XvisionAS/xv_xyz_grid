@@ -51,6 +51,22 @@
     "memory_resource": "cpp",
     "numeric": "cpp",
     "random": "cpp",
-    "string": "cpp"
+    "string": "cpp",
+    "csignal": "cpp",
+    "strstream": "cpp",
+    "bitset": "cpp",
+    "codecvt": "cpp",
+    "complex": "cpp",
+    "condition_variable": "cpp",
+    "list": "cpp",
+    "set": "cpp",
+    "future": "cpp",
+    "mutex": "cpp",
+    "thread": "cpp",
+    "cfenv": "cpp",
+    "cinttypes": "cpp",
+    "typeindex": "cpp",
+    "valarray": "cpp",
+    "variant": "cpp"
   }
 }

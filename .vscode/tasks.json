@@ -7,7 +7,8 @@
     "args": [
       "-g", "xv_xyz_grid.cpp",
       "-I", "Externals",
-      "-o", "xv_xyz_grid"
+      "-o", "xv_xyz_grid",
+      "-lz"
     ],
     "group": {
       "kind": "build",
