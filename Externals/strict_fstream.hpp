@@ -5,7 +5,7 @@
 #include <fstream>
 #include <cstring>
 #include <string>
-
+#include <string.h>
 /**
  * This namespace defines wrappers for std::ifstream, std::ofstream, and
  * std::fstream objects. The wrappers perform the following steps:
