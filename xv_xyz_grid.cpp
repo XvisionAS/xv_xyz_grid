@@ -78,6 +78,8 @@ struct process_t {
   int                       bitmap_width;
   int                       bitmap_height;
   bool                      export_bbox;
+  bool                      use_NODATA;
+  double                    NODATA;
 
   std::vector<real>         previous_bitmap;
   int                       previous_bitmap_width;
@@ -144,10 +146,22 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
     true
   );
 
+  cmdparser.add<double>("no-data",
+    'd',
+    "Define NODATA value",
+    false,
+    0
+  );
+
   cmdparser.parse_check(ac, av);
 
   process.inputs                   = cmdparser.rest();
   
+  process.use_NODATA = cmdparser.exist("no-data");
+  if (process.use_NODATA) {
+    process.NODATA  = cmdparser.get<double>("no-data");
+    std::cout << "Using NODATA " << process.NODATA << std::endl;
+  }
   std::string      simplify_split       = cmdparser.get<std::string>("simplify-split");
   std::vector<int> splits;
 
@@ -202,8 +216,13 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
           line = line.substr(0, comment);
         }
         vec3  p;
+        const double epsilon = std::numeric_limits<double>::epsilon();
         if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
-          output.write((char*)&p, sizeof(p));
+
+          // maybe glm::epsilonNotEqual(process.NODATA, p.z, epsilon) ?
+          if (!process.use_NODATA || process.NODATA != p.z) {
+            output.write((char*)&p, sizeof(p));
+          }
         }
       }
     }
@@ -218,6 +237,7 @@ void process_bin_get_aabb(process_t& process, const std::string& input_as_bin) {
     if (process.aabb_limit_valid && !process.aabb_limit.contains2d(p)) {
       continue;
     }
+    
     process.point_count++;
     process.aabb.add(p);
   }
