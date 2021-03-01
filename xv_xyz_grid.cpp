@@ -180,7 +180,7 @@ void parse_cmd_line(int ac, char** av, process_t& process) {
   if (process.simplify_split_use_ratio) {
     std::cout << "Using rationed output size x = " << process.simplify_split_x << std::endl;
   } else {
-    std::cout << "Using output size x = " << process.simplify_split_x << "y =" << process.simplify_split_y << std::endl;
+    std::cout << "Using output size x = " << process.simplify_split_x << " y = " << process.simplify_split_y << std::endl;
   }
 
 
@@ -558,10 +558,20 @@ void process_generate_normalmap(const process_t& process, const std::string& fil
 void process_normalmap(process_t& process, const std::string& input, const std::string& input_as_bin) {
   int  split            = 128;
   vec3 len              = process.aabb.len();
-  real bitmap_ratio     = len.x / len.y;
 
-  process.bitmap_width  = (int)glm::max<real>((split * bitmap_ratio), 4);
-  process.bitmap_height = (int)glm::max<real>((split * (1 / bitmap_ratio)), 4);
+  int  split_x       = process.simplify_split_x;
+  int  split_y       = process.simplify_split_y;
+
+  if (process.simplify_split_use_ratio) {
+    real bitmap_ratio  = len.x / len.y;
+
+    process.bitmap_width  = (int)glm::max<real>((split_x * bitmap_ratio), 4);
+    process.bitmap_height = (int)glm::max<real>((split_y * (1 / bitmap_ratio)), 4);
+  } else {
+    process.bitmap_width  = (int)glm::max<real>(split_x, 4);
+    process.bitmap_height = (int)glm::max<real>(split_y, 4);
+  }
+
   process.bitmap.resize(process.bitmap_width * process.bitmap_height, REAL_MAX);
 
   while (true) {
@@ -616,18 +626,20 @@ void process_export_bbox(process_t& process, const std::string& input, const std
 
 void process_xvb(process_t& process, const std::string& input, const std::string& input_as_bin) {
   vec3 len           = process.aabb.len();
-  real bitmap_ratio  = len.x / len.y;
   
   int  split_x       = process.simplify_split_x;
   int  split_y       = process.simplify_split_y;
 
   if (process.simplify_split_use_ratio) {
-    split_x *= bitmap_ratio;
-    split_y *= 1 / bitmap_ratio;
+    real bitmap_ratio  = len.x / len.y;
+
+    process.bitmap_width  = (int)glm::max<real>((split_x * bitmap_ratio), 4);
+    process.bitmap_height = (int)glm::max<real>((split_y * (1 / bitmap_ratio)), 4);
+  } else {
+    process.bitmap_width  = (int)glm::max<real>(split_x, 4);
+    process.bitmap_height = (int)glm::max<real>(split_y, 4);
   }
 
-  process.bitmap_width  = (int)glm::max<real>((split_x * bitmap_ratio), 4);
-  process.bitmap_height = (int)glm::max<real>((split_y * (1 / bitmap_ratio)), 4);
 
   process.bitmap.resize(process.bitmap_width * process.bitmap_height, REAL_MAX);
 
