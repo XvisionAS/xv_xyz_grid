@@ -9,19 +9,20 @@
 #include <chrono>
 #include <functional>
 
-#include <glm/glm.hpp>
-#include <glm/gtc/epsilon.hpp>
-#include <glm/gtx/intersect.hpp>
-#include <cmdline/cmdline.h>
+#include "Externals/glm/detail/func_common.hpp"
+#include "Externals/glm/glm.hpp"
+#include "Externals/glm/gtc/epsilon.hpp"
+#include "Externals/glm/gtx/intersect.hpp"
+#include "Externals/cmdline/cmdline.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // STB
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include <stb_image_write.h>
+#include "Externals/stb_image_write.h"
 ///////////////////////////////////////////////////////////////////////////////
 
-#include <zstr.hpp>
+#include "Externals/zstr.hpp"
 
 #ifdef _WIN32
   #include <io.h>
@@ -34,12 +35,14 @@ typedef unsigned char uint8;
 #if defined(SINGLE)
   typedef float real;
   typedef glm::vec3 vec3;
+  typedef glm::vec2 vec2;
   #define REAL float
   #define SCANF_FORMAT "%f %f %f"
-  #define REAL_MAX FLT_MAX
+  #define REAL_MAX FLT_MAX  
 #else
   typedef double real;
   typedef glm::dvec3 vec3;
+  typedef glm::dvec2 vec2;
   #define REAL double
   #define SCANF_FORMAT " %lf%*[ \t,;] %lf%*[ \t,;] %lf %*[\n]"
   #define REAL_MAX DBL_MAX
@@ -69,6 +72,7 @@ struct process_t {
   bool                      simplify_split_use_ratio;
   bool                      always_negate;
   bool                      generate_normal;
+  vec2                      resolution;
   AABB                      aabb;
   AABB                      aabb_limit;
   bool                      aabb_limit_valid;
@@ -98,6 +102,7 @@ void print_aabb(const std::string& pre, const AABB& aabb) {
   std::cout << ") -> ("; 
   std::cout << aabb.max.x << ", " << aabb.max.y << ")" << std::endl;
 }
+
 template<typename T>
 void split_array(const std::string& string, char delimiter, std::function<T(const char*)> converter, std::vector<T>& output) {
   std::string       element;
@@ -216,7 +221,7 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
           line = line.substr(0, comment);
         }
         vec3  p;
-        const double epsilon = std::numeric_limits<double>::epsilon();
+        const real epsilon = std::numeric_limits<real>::epsilon();
         if (std::sscanf(line.c_str(), SCANF_FORMAT, &p.x, &p.y, &p.z) == 3) {
 
           // maybe glm::epsilonNotEqual(process.NODATA, p.z, epsilon) ?
@@ -226,7 +231,50 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
         }
       }
     }
+
   }
+}
+
+void process_bin_get_resolution(process_t& process, const std::string& input_as_bin) {    
+  const std::string input_as_bin_res = input_as_bin + ".res";
+
+  if (file_exists(input_as_bin_res)) {
+    std::ifstream input(input_as_bin_res, std::ios::binary | std::ios::in);
+    input.read((char*)&process.resolution, sizeof(process.resolution));
+  } else {    
+    zstr::ifstream i1(input_as_bin, std::ios::binary | std::ios::in);  
+    vec3           p1, p2;
+    process.resolution.x = REAL_MAX;
+    process.resolution.y = REAL_MAX;
+
+    const real epsilon = std::numeric_limits<real>::epsilon();
+    
+    // this is real slow, and we hope that the data is well formatted
+    // ( so that the point are already sorted, basically, which is the case for 99.5% of our files
+    // other wise, the user might have to input the correct resolution
+
+    while (i1.read((char*)&p1, sizeof(p1)) && i1.read((char*)&p2, sizeof(p2))) {
+      // zstr::ifstream i2(input_as_bin, std::ios::binary | std::ios::in);
+
+      // while (i2.read((char*)&p2, sizeof(p2))) {
+      real dx = glm::abs(p1.x - p2.x);
+      real dy = glm::abs(p1.y - p2.y);
+      
+      
+      if (dx > epsilon) {
+        process.resolution.x = glm::min(process.resolution.x, dx);  
+      }
+      if (dy > epsilon) {
+        process.resolution.y = glm::min(process.resolution.y, dy);
+      }
+        
+      // }
+    }
+
+    std::ofstream output(input_as_bin_res, std::ios::binary | std::ios::out);
+    output.write((char*)&process.resolution, sizeof(process.resolution));
+  }
+  std::cout << "Resolution: " << process.resolution.x << ", " << process.resolution.y << std::endl;
 }
 
 void process_bin_get_aabb(process_t& process, const std::string& input_as_bin) {
@@ -241,10 +289,22 @@ void process_bin_get_aabb(process_t& process, const std::string& input_as_bin) {
     process.point_count++;
     process.aabb.add(p);
   }
+  
+  if (process.aabb.min.x > process.aabb_limit.min.x) {
+    process.aabb.min.x -= process.resolution.x;
+  }
+  if (process.aabb.min.y > process.aabb_limit.min.y) {
+    process.aabb.min.y -= process.resolution.y;
+  }
+  if (process.aabb.max.x < process.aabb_limit.max.x) {
+    process.aabb.max.x += process.resolution.x;
+  }
+  if (process.aabb.max.y < process.aabb_limit.max.y) {
+    process.aabb.max.y += process.resolution.y;
+  }
 }
 
 real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) {
-
   vec3                len    = process.aabb.len();
   int                 width  = process.bitmap_width;
   int                 height = process.bitmap_height;
@@ -341,6 +401,7 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   }
   return 1.0 - ((real) empty / (real) size);
 }
+
 void process_bitmap_to_png(process_t& process, const std::string& outputFile) {
   std::vector<unsigned char> data;
 
@@ -665,6 +726,8 @@ int main(int ac, char **av) {
 
     std::cout << "process_xyz_to_bin" << std::endl;
     process_xyz_to_bin(process, input, input_as_bin);
+    std::cout << "process_bin_get_resolution" << std::endl;
+    process_bin_get_resolution(process, input_as_bin);
     std::cout << "process_bin_get_aabb" << std::endl;
 
     process_bin_get_aabb(process, input_as_bin);
