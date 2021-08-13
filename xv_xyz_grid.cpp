@@ -238,10 +238,11 @@ void process_xyz_to_bin(process_t& process, const std::string& inputFileName, co
 void process_bin_get_resolution(process_t& process, const std::string& input_as_bin) {    
   const std::string input_as_bin_res = input_as_bin + ".res";
 
-  if (file_exists(input_as_bin_res)) {
-    std::ifstream input(input_as_bin_res, std::ios::binary | std::ios::in);
-    input.read((char*)&process.resolution, sizeof(process.resolution));
-  } else {    
+  // if (file_exists(input_as_bin_res)) {
+  //   std::ifstream input(input_as_bin_res, std::ios::binary | std::ios::in);
+  //   input.read((char*)&process.resolution, sizeof(process.resolution));
+  // } else 
+  {    
     zstr::ifstream i1(input_as_bin, std::ios::binary | std::ios::in);  
     vec3           p1, p2;
     process.resolution.x = REAL_MAX;
@@ -306,9 +307,19 @@ void process_bin_get_aabb(process_t& process, const std::string& input_as_bin) {
 
 real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) {
   vec3                len    = process.aabb.len();
+  
+  if ((len.x / process.bitmap_width) < process.resolution.x) {
+    process.bitmap_width = len.x / process.resolution.x;
+  }
+
+  if ((len.y / process.bitmap_height) < process.resolution.y) {
+    process.bitmap_height = len.y / process.resolution.y;
+  }
+
   int                 width  = process.bitmap_width;
   int                 height = process.bitmap_height;
-  vec3                ratio  = vec3(process.bitmap_width - 1, process.bitmap_height - 1, 1) / len;
+  
+  vec3                ratio  = vec3(width - 1, height - 1, 1) / len;
   vec3                p;
   zstr::ifstream      input(input_as_bin, std::ios::binary | std::ios::in);
   std::vector<real>   count;
@@ -324,6 +335,9 @@ real process_bin_to_bitmap(process_t& process, const std::string& input_as_bin) 
   if (glm::isinf(-ratio.z)) {
     ratio.z = 0;
   }
+
+  std::cout << len.x / process.bitmap_width << " : " << len.y / process.bitmap_height << std::endl;
+
   std::vector<real> bitmap;
   bitmap.resize(process.bitmap.size(), 0);
   count.resize(process.bitmap.size(), 0);
