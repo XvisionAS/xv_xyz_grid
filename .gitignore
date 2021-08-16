@@ -2,3 +2,6 @@ build
 !Platforms\premake5.exe
 data
 xv_xyz_grid
+fo-xyz-grid
+fo-xyz-to-bin
+fo-bin-get-resolution
